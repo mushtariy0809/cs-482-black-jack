@@ -1,0 +1,14 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="1600" height="1000" viewBox="0 0 1600 1000" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="Panel">
+<use xlink:href="#stroke0_0_26" fill="#040B09"/>
+<use xlink:href="#stroke0_0_26" fill="url(#paint0_radial_0_26)"/>
+</g>
+<defs>
+<radialGradient id="paint0_radial_0_26" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(800 409.091) scale(1066.67 454.545)">
+<stop stop-color="#0F3A2C"/>
+<stop offset="0.55" stop-color="#082019"/>
+<stop offset="1" stop-color="#040B09" stop-opacity="0"/>
+</radialGradient>
+<path id="stroke0_0_26" d="M1600 0H0V1000H1600V0Z"/>
+</defs>
+</svg>
