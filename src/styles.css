@@ -5,3 +5,25 @@
 /* Original exported Figma surfaces, sized through their layout wrappers. */
 body{background-image:url('/assets/imgTutorial.svg');background-size:cover;background-attachment:fixed}header{background-image:url('/assets/imgPanel.svg');background-position:center;background-size:calc(100% + 48px) 124px}.panel{background-image:url('/assets/imgPanel11.svg');background-size:calc(100% + 81px) calc(100% + 81px);background-position:center 28%;border-color:transparent;box-shadow:none}.number{background-image:url('/assets/imgPanel12.svg');background-size:calc(100% + 13px) calc(100% + 13px);background-position:center}.watch{background-image:url('/assets/imgPanel9.svg');background-size:calc(100% + 37px) calc(100% + 37px);background-position:center}.panel>.primary{background-image:url('/assets/imgPanel13.svg');background-size:calc(100% + 37px) calc(100% + 37px);background-position:center}.pill{background-image:url('/assets/imgPanel10.svg');background-size:calc(100% + 13px) calc(100% + 13px);background-position:center}footer button{background-image:url('/assets/imgPanel14.svg');background-size:calc(100% + 13px) calc(100% + 13px);background-position:center}.card{box-shadow:none}.card:before{content:'';position:absolute;inset:6px -3px -6px 3px;background:url('/assets/imgPanel7.svg') center/100% 100%;z-index:-1}.card{isolation:isolate}.card:before{z-index:-1}.lesson-cards:has(+.lesson-controls .lesson-copy){top:7%;left:50%;transform:translateX(-50%)}.lesson-cards:has(+.lesson-controls .lesson-copy) .card{flex-basis:90px;width:90px;height:132px}.lesson-cards:has(+.lesson-controls .lesson-copy) .bottom-suit{bottom:30px}.lesson-cards:has(+.lesson-controls .lesson-copy) .center-suit{transform:translate(-50%,-50%) scale(.8)}
 .card:not(.back){background:none}.card:not(.back):after{content:'';position:absolute;inset:0;background:url('/assets/imgPanel8.svg') center/100% 100%;z-index:-1}.back:before{display:none}.panel{border:1px solid #4d6043}
+
+/* 
+  Login and Registration Form Styles
+*/
+.panel form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.panel form input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
