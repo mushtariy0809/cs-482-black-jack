@@ -36,7 +36,7 @@ function Game({game,setGame}) {
  
  <div style={{ marginBottom: '16px'}}>
   <span className="pill" style={{ fontSize: '15px', color: '#f2d388'}}>
-    Bankroll: ${game.money}
+    Money: ${game.money}
   </span>
 </div>
 
