@@ -28,8 +28,10 @@ export function compareHands(player, dealer) {
   return p.total === d.total ? 'push' : p.total > d.total ? 'player' : 'dealer';
 }
 // U7: Initialize a session before betting/dealing. Teammates can use this entry point.
-export function startGame() { return { deck: shuffleDeck(createDeck()), player: [], dealer: [], phase: 'ready', result: null }; }
-export function dealRound(game) {
+export function startGame(initialMoney = 1000) { 
+  return {deck: shuffleDeck(createDeck()), player: [], dealer: [], phase: 'ready', result: null, money: initialMoney};} //U4: Adding initial money and also showing the count
+
+  export function dealRound(game) {
   if (game.phase !== 'ready') throw new Error('Start a fresh game before dealing.');
   if (game.deck.length < 4) throw new Error('Not enough cards to deal.');
   const deck = [...game.deck];
