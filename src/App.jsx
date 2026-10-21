@@ -29,7 +29,7 @@ function Tutorial({onStart,onClose}) {
     <div className="lesson-controls" aria-live="polite">{lesson ? <div className="lesson-copy"><h2>{lesson.title}</h2><p>{lesson.text}</p><strong>{lesson.note}</strong><div className="lesson-nav"><button disabled={step===0} onClick={()=>setStep(step-1)}>Back</button><span>{step+1} / {lessons.length}</span><button className="primary" onClick={()=>step===3?onStart():setStep(step+1)}>{step===3?'Start the game':'Next →'}</button></div></div> : <><button className="primary watch" onClick={()=>setStep(0)}>▶ Start tutorial</button><span className="pill">4 short lessons · Read at your pace</span></>}</div>
   </section><aside className="panel"><h2>Three things to know</h2><ol className="tips"><li><div><span className="number">01</span><h3>Get close to 21</h3></div><p>Without going over.</p></li><li><div><span className="number">02</span><h3>Hit or stand</h3></div><p>Take a card or keep your hand.</p></li><li><div><span className="number">03</span><h3>Beat the dealer</h3></div><p>The best hand wins. Equal totals push.</p></li></ol><button className="primary wide" onClick={onStart}>Start the game</button></aside></div><footer><span>Practice mode · No bets or saved history</span><button onClick={onClose}>Close tutorial</button></footer></>;
 }
-function Game({game,setGame,player,historySaved}) {
+function Game({game,setGame,player,historySaved, bet, setBet}) {
 
   useEffect(() => {
     if (
@@ -111,15 +111,74 @@ function Game({game,setGame,player,historySaved}) {
           <span>Stands on all 17s</span>
           </p>
           </div>
-          <div className="practice-controls">{game.phase==='ready'?
-            <button className="primary wide" onClick={()=>setGame(dealRound(game))}>Deal hand</button>:finished?
-            <button className="primary wide" onClick={()=>setGame(startGame(game.money))}>Start a fresh game</button>:<>
+          <div className="practice-controls">
+            {game.phase==='ready'? (
+              <>
+            <div style={{ marginButton: '12px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap'}}>
+              <span style={{ fontSize: '13px', fontWeight: 'bold', width: '100%', marginBottom: '4px'}}>Select Bet:</span>
+              {[5,10,25,50,100].map((amount) => ( 
+                <button 
+                key={amount} 
+                className={bet==amount ? 'primary' : ''}
+                style={{ padding: '4px 10px', fontSize: '12px', flex: '1'}}
+                onClick={() => setBet(amount)}
+                disabled={amount > game.money}
+                >
+                ${amount}
+                </button>
+              ))}
+            </div>
+            
+            <button className="primary wide" 
+            onClick={()=>setGame(dealRound(game, bet))}
+            disabled={bet > game.money || game.money <=0}
+            >
+              Deal hand (${bet})
+              </button>
+              </>
+            ) : finished ? (
+            <button 
+            className="primary wide" 
+            onClick={()=>setGame(startGame(game.money))}
+            >
+              Start a fresh game
+              </button>
+            ) : (
+              <>
             <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%', marginBottom: '8px'}}>
-            <button className="Wide" disabled={game.player.length !==2} onClick={() =>{}}>Double</button>
-            <button className="wide" disabled={game.player.length !== 2 || game.player[0].rank !== game.player[1].rank} onClick={() => {}}>Split</button>                                </div>
-            <button className="primary wide" onClick={()=>setGame(hit(game))}disabled={p.bust || p.total >=21}>Hit</button>
-            <button className="wide" onClick={()=>setGame(stand(game))}disabled={p.bust}>Stand</button></>
-            }</div>
+            <button 
+            className="Wide"
+            disabled={game.player.length !==2}
+            onClick={() =>{}}
+            >
+              Double
+              </button>
+            <button 
+            className="wide" 
+            disabled={game.player.length !== 2 || game.player[0].rank !== game.player[1].rank}
+            onClick={() => {}}
+            >
+              Split
+              </button>                                
+              </div>
+            <button 
+            className="primary wide" 
+            onClick={()=>setGame(hit(game))}
+            disabled={p.bust || p.total >=21}
+            >
+              Hit
+              </button>
+            <button 
+            className="wide"
+            onClick={()=>setGame(stand(game))}
+            disabled={p.bust}
+            >
+              Stand
+              </button>
+              </>
+            )}
+            </div>
+
             </aside>
             </div>
             <footer>
@@ -383,6 +442,7 @@ export default function App() {
  const [game,setGame]=useState(null);
  const [player,setPlayer]=useState(null);
  const [authMode, setAuthMode] = useState('login');
+ const [bet, setBet] = useState(10);
  const historySaved = useRef(new Set());
  const main=useRef(null);
  useEffect(()=>{main.current?.focus();},[screen]);
@@ -482,7 +542,7 @@ return (
           onClose={() => setScreen(game ? 'game' : 'start')}
         />
       ) : screen === 'game' ? (
-        <Game game={game} setGame={setGame} player={player} historySaved={historySaved} />
+        <Game game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet}/>
       ) : screen === 'history' && player?.type === 'registered' ? (
         <HistoryScreen
           player={player}

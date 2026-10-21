@@ -33,6 +33,17 @@ export function compareHands(player, dealer) {
   return p.total === d.total ? 'push' : p.total > d.total ? 'player' : 'dealer';
 }
 
+export function resolvePayout(money, bet, result, player) {
+  const isBlackjack = scoreHand(player).blackjack;
+  if (result === 'player') {
+    const winnings = bet * 2;
+    return money + winnings;
+  } else if (result === 'push') {
+    return money + bet;
+  }
+  return money;
+}
+
 export function startGame(initialMoney = 1000) { 
   return {
     roundId: crypto.randomUUID(), 
@@ -41,25 +52,34 @@ export function startGame(initialMoney = 1000) {
     dealer: [], 
     phase: 'ready', 
     result: null, 
-    money: initialMoney
+    money: initialMoney,
+    bet: 0
   };
 }
 
-export function dealRound(game) {
+export function dealRound(game, betAmount = 10) {
   if (game.phase !== 'ready') throw new Error('Start a fresh game before dealing.');
   if (game.deck.length < 4) throw new Error('Not enough cards to deal.');
+  const currentMoney = game.money !== undefined ? game.money : 1000;
+  const wager = Math.min(betAmount, currentMoney);
   const deck = [...game.deck];
   const player = [deck.pop()], 
   dealer = [deck.pop()];
   player.push(deck.pop()); dealer.push(deck.pop());
   const finished = scoreHand(player).blackjack || scoreHand(dealer).blackjack;
+  const result = finished ? compareHands(player, dealer) : null;
+
+  const moneyAfterDeal = finished ? resolvePayout(currentMoney - wager, wager, result, player) : currentMoney - wager;
+
   return { 
     ...game,
+    money: moneyAfterDeal,
+    bet: wager,
     deck, 
     player, 
     dealer, 
     phase: finished ? 'finished' : 'player', 
-    result: finished ? compareHands(player, dealer) : null 
+    result 
   };
 }
 
@@ -67,7 +87,9 @@ export function stand(game) {
   if (game.phase !== 'player') return game;
   const deck = [...game.deck], dealer = [...game.dealer];
   while (dealerShouldHit(dealer)) { if (!deck.length) throw new Error('Deck exhausted.'); dealer.push(deck.pop()); }
-  return { ...game, deck, dealer, phase: 'finished', result: compareHands(game.player, dealer) };
+  const result = compareHands(game.player, dealer);
+  const money = resolvePayout(game.money, game.bet, result, game.player);
+  return { ...game, money, deck, dealer, phase: 'finished', result };
 }
 
 export function hit(game) {
