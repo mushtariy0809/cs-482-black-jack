@@ -94,7 +94,7 @@ function Game({game,setGame,player,historySaved}) {
  <h2>{game.phase==='ready'?'Take your seat.':'Learn as you play.'}</h2><p>This practice area lets you check the game rules before the team connects betting and the final controls.</p><div className="rule-list"><p><strong>Number cards</strong><span>Face value</span></p><p><strong>J, Q, K</strong><span>10 points</span></p><p><strong>Ace</strong><span>1 or 11 points</span></p><p><strong>Dealer</strong><span>Stands on all 17s</span></p></div><div className="practice-controls">{game.phase==='ready'?<button className="primary wide" onClick={()=>setGame(dealRound(game))}>Deal practice hand</button>:finished?<button className="primary wide" onClick={()=>setGame(startGame())}>Start a fresh game</button>:<><button className="primary" onClick={()=>setGame(hit(game))}>Practice hit</button><button onClick={()=>setGame(stand(game))}>Practice stand</button></>}</div></aside></div><footer><span>Single deck · Dealer stands on soft 17 · Practice only</span></footer></>;
 
 
- return <><h1>The Green Room</h1>{player && <p>Welcome, {player.name}!</p>}<div className="layout"><section className="table game-table" aria-label="Practice table"><div className="hand"><span className="pill">Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}</span><div className="cards">{game.dealer.map((c,i)=><Card key={c.id} card={c} hidden={!finished&&i===1}/>)}</div></div><div className="table-message" role="status">{game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}</div><div className="hand"><div className="cards">{game.player.map(c=><Card key={c.id} card={c}/>)}</div><span className="pill">Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</span></div></section><aside className="panel game-panel"><span className="eyebrow">PRACTICE HAND</span><h2>{game.phase==='ready'?'Take your seat.':'Learn as you play.'}</h2><p>This practice area lets you check the game rules before the team connects betting and the final controls.</p><div className="rule-list"><p><strong>Number cards</strong><span>Face value</span></p><p><strong>J, Q, K</strong><span>10 points</span></p><p><strong>Ace</strong><span>1 or 11 points</span></p><p><strong>Dealer</strong><span>Stands on all 17s</span></p></div><div className="practice-controls">{game.phase==='ready'?<button className="primary wide" onClick={()=>setGame(dealRound(game))}>Deal practice hand</button>:finished?<button className="primary wide" onClick={()=>setGame(startGame())}>Start a fresh game</button>:<><button className="primary" onClick={()=>setGame(hit(game))}>Practice hit</button><button onClick={()=>setGame(stand(game))}>Practice stand</button></>}</div></aside></div><footer><span>Single deck · Dealer stands on soft 17 · Practice only</span></footer></>;
+ return <><h1>The Green Room</h1>{player && <p>Welcome, {player.name}!</p>}<div className="layout"><section className="table game-table" aria-label="Practice table"><div className="hand"><span className="pill">Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}</span><div className="cards">{game.dealer.map((c,i)=><Card key={c.id} card={c} hidden={!finished&&i===1}/>)}</div></div><div className="table-message" role="status">{game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}</div><div className="hand"><div className="cards">{game.player.map(c=><Card key={c.id} card={c}/>)}</div><span className="pill">Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</span></div></section><aside className="panel game-panel"><span className="eyebrow">PRACTICE HAND</span><h2>{game.phase==='ready'?'Take your seat.':'Learn as you play.'}</h2><p>This practice area lets you check the game rules before the team connects betting and the final controls.</p><div className="rule-list"><p><strong>Number cards</strong><span>Face value</span></p><p><strong>J, Q, K</strong><span>10 points</span></p><p><strong>Ace</strong><span>1 or 11 points</span></p><p><strong>Dealer</strong><span>Stands on all 17s</span></p></div><div className="practice-controls">{game.phase==='ready'?<button className="primary wide" onClick={()=>setGame(dealRound(game))}>Deal practice hand</button>:finished?<button className="primary wide" onClick={()=>setGame(startGame(game.money))}>Start a fresh game</button>:<><button className="primary" onClick={()=>setGame(hit(game))}>Practice hit</button><button onClick={()=>setGame(stand(game))}>Practice stand</button></>}</div></aside></div><footer><span>Single deck · Dealer stands on soft 17 · Practice only</span></footer></>;
 }
 
 function AuthScreen({ mode, setMode, onSuccess, onBack }) {
@@ -306,7 +306,7 @@ function begin(){
 
 return (
   <>
-    <header>
+    <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
       <a
         className="brand"
         href="#"
@@ -342,7 +342,29 @@ return (
       )}
 
       </nav>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginleft: 'auto'}}>
+        {screen == 'game' && (
+          <button
+            onClick={() => {
+              setGame(null);
+              setScreen('start');
+            }}
+            style={{
+              background: '#8a150c',
+              color: 'white',
+              border: 'none',
+              padding: '6px 16px',
+              borderRadius: '9999px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              lineheight  : '1.5'
+            }}
+          >
+            Exit Game
+          </button>
+        )}
       <span className="practice-tag">Practice mode</span>
+      </div>
     </header>
 
     <main ref={main} tabIndex="-1">
