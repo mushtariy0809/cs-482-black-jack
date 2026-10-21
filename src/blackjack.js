@@ -100,3 +100,27 @@ export function hit(game) {
   if (scoreHand(player).bust) return { ...next, phase: 'finished', result: 'dealer' };
   return scoreHand(player).total === 21 ? stand(next) : next;
 }
+
+export function doubleDown(game) {
+  if (game.phase !== 'player') return game;
+  if (game.player.length !== 2) return game;
+  if (game.money < game.bet) return game;
+  if (!game.deck.length) throw new Error('Deck exhausted.');
+
+  const currentMoney = game.money;
+  const originalBet = game.bet;
+  const newMoney = currentMoney - originalBet;
+  const newBet = originalBet * 2;
+
+  const deck = [...game.deck];
+  const player = [...game.player, deck.pop()];
+  const pScore = scoreHand(player);
+
+  const next = { ...game, deck, player, money: newMoney, bet: newBet };
+
+  if (pScore.bust) {
+    return { ...next, phase: 'finished', result: 'dealer' };
+  }
+
+  return stand(next);
+}
