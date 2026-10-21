@@ -30,7 +30,7 @@ export function compareHands(player, dealer) {
 export function startGame(initialMoney = 1000) { 
   return {deck: shuffleDeck(createDeck()), player: [], dealer: [], phase: 'ready', result: null, money: initialMoney};} //U4: Adding initial money and also showing the count
 
-  export function dealRound(game) {
+export function dealRound(game) {
 export function startGame() { return {roundId: crypto.randomUUID(), deck: shuffleDeck(createDeck()), player: [], dealer: [], phase: 'ready', result: null }; }
 export function dealRound(game) {
 
