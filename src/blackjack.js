@@ -47,13 +47,15 @@ export function resolvePayout(money, bet, result, player) {
 export function startGame(initialMoney = 1000) { 
   return {
     roundId: crypto.randomUUID(), 
-    deck: shuffleDeck(createDeck()), 
+    deck: shuffleDeck(createDeck()),
+    hands: [], 
     player: [], 
     dealer: [], 
     phase: 'ready', 
     result: null, 
     money: initialMoney,
-    bet: 0
+    bet: 0,
+    activeHandIndex: 0
   };
 }
 
@@ -66,9 +68,9 @@ export function dealRound(game, betAmount = 10) {
   const player = [deck.pop()], 
   dealer = [deck.pop()];
   player.push(deck.pop()); dealer.push(deck.pop());
+
   const finished = scoreHand(player).blackjack || scoreHand(dealer).blackjack;
   const result = finished ? compareHands(player, dealer) : null;
-
   const moneyAfterDeal = finished ? resolvePayout(currentMoney - wager, wager, result, player) : currentMoney - wager;
 
   return { 
@@ -76,37 +78,116 @@ export function dealRound(game, betAmount = 10) {
     money: moneyAfterDeal,
     bet: wager,
     deck, 
-    player, 
-    dealer, 
+    hands: [{ cards: player, bet: wager}],
+    player: player, 
+    dealer: dealer, 
+    activeHandIndex: 0,
     phase: finished ? 'finished' : 'player', 
     result 
   };
 }
 
+export function advanceTurnOrFinish(game, updatedHands){
+  const nextIndex = game.activeHandIndex + 1;
+  if (nextIndex < updatedHands.length) {
+    return {
+      ...game,
+      hands: updatedHands,
+      activeHandIndex: nextIndex,
+      player: updatedHands[nextIndex].cards
+    };  
+  } 
+  else {
+    const deck = [...game.deck], dealer = [...game.dealer];
+    while(dealerShouldHit(dealer)){
+      if (!deck.length) throw new Error('Deck exhausted.');
+      dealer.push(deck.pop());
+    }
+
+    let finalMoney = game.money;
+    updatedHands.forEach(hand => {
+      const res = compareHands(hand.cards, dealer);
+      finalMoney = resolvePayout(finalMoney, hand.bet, res, hand.cards);
+    });
+
+    const primaryResult = compareHands(updatedHands[0].cards, dealer);
+
+    return{
+      ...game,
+      money: finalMoney,
+      deck,
+      dealer,
+      hands: updatedHands,
+      phase: 'finished',
+      result: primaryResult,
+      player: updatedHands[0].cards
+    }
+  }
+}
+
 export function stand(game) {
   if (game.phase !== 'player') return game;
+
+  return advanceTurnOrFinish(game, game.hands);
+ {/*
   const deck = [...game.deck], dealer = [...game.dealer];
   while (dealerShouldHit(dealer)) { if (!deck.length) throw new Error('Deck exhausted.'); dealer.push(deck.pop()); }
   const result = compareHands(game.player, dealer);
   const money = resolvePayout(game.money, game.bet, result, game.player);
   return { ...game, money, deck, dealer, phase: 'finished', result };
+ */}
 }
 
 export function hit(game) {
   if (game.phase !== 'player') return game;
   if (!game.deck.length) throw new Error('Deck exhausted.');
-  const deck = [...game.deck], player = [...game.player, deck.pop()];
-  const next = { ...game, deck, player };
-  if (scoreHand(player).bust) return { ...next, phase: 'finished', result: 'dealer' };
-  return scoreHand(player).total === 21 ? stand(next) : next;
+  const deck = [...game.deck];
+  const hands = [...game.hands];
+  const currentHand ={ ...hands[game.activeHandIndex]};
+
+  currentHand.cards = [...currentHand.cards, deck.pop()];
+  hands[game.activeHandIndex] = currentHand;
+
+  const pScore = scoreHand(currentHand.cards);
+  if (pScore.bust || pScore.total === 21) {
+    return advanceTurnOrFinish({ ...game, deck}, hands);
+  }
+
+  return {
+    ...game,
+    deck,
+    hands,
+    player: currentHand.cards
+  };
+
 }
 
 export function doubleDown(game) {
   if (game.phase !== 'player') return game;
+
+  const currentHand = game.hands[game.activeHandIndex];
+  if (currentHand.cards.length !== 2 || game.money < currentHand.bet) return game;
+  if (!game.deck.length) throw new Error('Deck exhausted.');
+
+
   if (game.player.length !== 2) return game;
   if (game.money < game.bet) return game;
   if (!game.deck.length) throw new Error('Deck exhausted.');
 
+  const deck = [...game.deck];
+  const hands = [...game.hands];
+  const updatedHand = {
+    ...currentHand,
+    cards: [...currentHand.cards, deck.pop()],
+    bet: currentHand.bet * 2
+  };
+
+  hands[game.activeHandIndex] = updatedHand;
+
+  const newMoney = game.money - currentHand.bet;
+  return advanceTurnOrFinish({ ...game, money: newMoney, deck }, hands);
+
+{/*
   const currentMoney = game.money;
   const originalBet = game.bet;
   const newMoney = currentMoney - originalBet;
@@ -123,4 +204,40 @@ export function doubleDown(game) {
   }
 
   return stand(next);
+  */}
+}
+
+export function splitHand(game){
+  if (game.phase !== 'player') return game;
+  const currentHand = game.hands[game.activeHandIndex];
+  if(currentHand.cards.length !== 2) return game;
+  if(currentHand.cards[0].rank !== currentHand.cards[1].rank) return game;
+  if(game.money < currentHand.bet) return game;
+  if(game.deck.length < 2) throw new Error('Not enough cards to split.');
+
+
+  const deck = [...game.deck];
+  const card1 = currentHand.cards[0];
+  const card2 = currentHand.cards[1];
+  const bet = currentHand.bet;
+
+  const hand1 = [card1, deck.pop()];
+  const hand2 = [card2, deck.pop()];
+
+  const newHands = [
+    ...game.hands.slice(0, game.activeHandIndex),
+    {cards: hand1, bet},
+    {cards: hand2, bet},
+    ...game.hands.slice(game.activeHandIndex + 1)
+  ];
+
+  const newMoney = game.money - bet;
+
+  return {
+    ...game,
+    money: newMoney,
+    deck,
+    hands: newHands,
+    player: newHands[game.activeHandIndex].cards
+  }
 }

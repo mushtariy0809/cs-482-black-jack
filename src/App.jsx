@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { startGame, dealRound, hit, stand, doubleDown, scoreHand } from './blackjack.js';
+import { startGame, dealRound, hit, stand, doubleDown, splitHand, scoreHand } from './blackjack.js';
 import './styles.css';
 
 const ASSETS = '/assets/';
@@ -155,8 +155,12 @@ function Game({game,setGame,player,historySaved, bet, setBet}) {
               </button>
             <button 
             className="wide" 
-            disabled={game.player.length !== 2 || game.player[0].rank !== game.player[1].rank}
-            onClick={() => {}}
+            disabled={
+              game.hands?.[game.activeHandIndex]?.cards.length !== 2 ||
+              game.hands?.[game.activeHandIndex]?.cards[0].rank !== game.hands?.[game.activeHandIndex]?.cards[1].rank || 
+              game.money < game.hands?.[game.activeHandIndex]?.bet
+            }
+            onClick={() => setGame(splitHand(game))}
             >
               Split
               </button>                                
