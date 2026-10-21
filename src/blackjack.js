@@ -1,4 +1,4 @@
-// U8: Pure functions. No interface, database, or money handling here.
+
 export const RULES = Object.freeze({ dealerStandsOnSoft17: true });
 const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 export function cardValue(rank) {
@@ -27,14 +27,14 @@ export function compareHands(player, dealer) {
   if (p.blackjack !== d.blackjack) return p.blackjack ? 'player' : 'dealer';
   return p.total === d.total ? 'push' : p.total > d.total ? 'player' : 'dealer';
 }
-// U7: Initialize a session before betting/dealing. Teammates can use this entry point.
+
 export function startGame(initialMoney = 1000) { 
   return {deck: shuffleDeck(createDeck()), player: [], dealer: [], phase: 'ready', result: null, money: initialMoney};} //U4: Adding initial money and also showing the count
 
   export function dealRound(game) {
 export function startGame() { return {roundId: crypto.randomUUID(), deck: shuffleDeck(createDeck()), player: [], dealer: [], phase: 'ready', result: null }; }
 export function dealRound(game) {
->>>>>>> michele_branch
+
   if (game.phase !== 'ready') throw new Error('Start a fresh game before dealing.');
   if (game.deck.length < 4) throw new Error('Not enough cards to deal.');
   const deck = [...game.deck];
