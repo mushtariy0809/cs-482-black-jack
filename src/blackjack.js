@@ -32,20 +32,26 @@ export function startGame(initialMoney = 1000) {
   return {deck: shuffleDeck(createDeck()), player: [], dealer: [], phase: 'ready', result: null, money: initialMoney};} //U4: Adding initial money and also showing the count
 
   export function dealRound(game) {
+export function startGame() { return {roundId: crypto.randomUUID(), deck: shuffleDeck(createDeck()), player: [], dealer: [], phase: 'ready', result: null }; }
+export function dealRound(game) {
+>>>>>>> michele_branch
   if (game.phase !== 'ready') throw new Error('Start a fresh game before dealing.');
   if (game.deck.length < 4) throw new Error('Not enough cards to deal.');
   const deck = [...game.deck];
-  const player = [deck.pop()], dealer = [deck.pop()];
+  const player = [deck.pop()], 
+  dealer = [deck.pop()];
   player.push(deck.pop()); dealer.push(deck.pop());
   const finished = scoreHand(player).blackjack || scoreHand(dealer).blackjack;
-  return { deck, player, dealer, phase: finished ? 'finished' : 'player', result: finished ? compareHands(player, dealer) : null };
+  return { roundId: game.roundId, deck, player, dealer, phase: finished ? 'finished' : 'player', result: finished ? compareHands(player, dealer) : null };
 }
+
 export function stand(game) {
   if (game.phase !== 'player') return game;
   const deck = [...game.deck], dealer = [...game.dealer];
   while (dealerShouldHit(dealer)) { if (!deck.length) throw new Error('Deck exhausted.'); dealer.push(deck.pop()); }
   return { ...game, deck, dealer, phase: 'finished', result: compareHands(game.player, dealer) };
 }
+
 export function hit(game) {
   if (game.phase !== 'player') return game;
   if (!game.deck.length) throw new Error('Deck exhausted.');
