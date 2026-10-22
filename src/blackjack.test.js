@@ -21,6 +21,16 @@ assert.equal(res.hands[0].cards.length, 3);
 assert.equal(res.hands[0].bet, 20);
 assert.equal(res.money, 90);
 assert.equal(res.phase, 'finished');
-}
 
-)
+});
+
+test('split hand will create two hands and draw a card for each', ()=>{
+const g = { ...startGame(100), deck: hand('2','3'), hands: [{ cards: hand('8','8'), bet: 10 }], player: hand('8','8'), dealer: hand('10','7'), phase: 'player', activeHandIndex: 0 };
+const res = splitHand(g);
+assert.equal(res.hands.length, 2);
+assert.equal(res.hands[0].cards.length, 2);
+assert.equal(res.hands[1].cards.length, 2);
+assert.equal(res.hands[0].bet, 10);
+assert.equal(res.hands[1].bet, 10);
+assert.equal(res.money, 90);
+});
