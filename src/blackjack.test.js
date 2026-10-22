@@ -34,3 +34,11 @@ assert.equal(res.hands[0].bet, 10);
 assert.equal(res.hands[1].bet, 10);
 assert.equal(res.money, 90);
 });
+
+
+test('resolvePayout returns correct money based on result and blackjack', ()=>{
+assert.equal(resolvePayout(100, 10, 'player', hand('10','9')), 120);
+assert.equal(resolvePayout(100, 10, 'push', hand('10','10')), 110);
+assert.equal(resolvePayout(100, 10, 'dealer', hand('10','A')), 100);
+
+});
