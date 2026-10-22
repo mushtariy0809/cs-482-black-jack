@@ -129,13 +129,7 @@ export function stand(game) {
   if (game.phase !== 'player') return game;
 
   return advanceTurnOrFinish(game, game.hands);
- {/*
-  const deck = [...game.deck], dealer = [...game.dealer];
-  while (dealerShouldHit(dealer)) { if (!deck.length) throw new Error('Deck exhausted.'); dealer.push(deck.pop()); }
-  const result = compareHands(game.player, dealer);
-  const money = resolvePayout(game.money, game.bet, result, game.player);
-  return { ...game, money, deck, dealer, phase: 'finished', result };
- */}
+
 }
 
 export function hit(game) {
@@ -187,24 +181,6 @@ export function doubleDown(game) {
   const newMoney = game.money - currentHand.bet;
   return advanceTurnOrFinish({ ...game, money: newMoney, deck }, hands);
 
-{/*
-  const currentMoney = game.money;
-  const originalBet = game.bet;
-  const newMoney = currentMoney - originalBet;
-  const newBet = originalBet * 2;
-
-  const deck = [...game.deck];
-  const player = [...game.player, deck.pop()];
-  const pScore = scoreHand(player);
-
-  const next = { ...game, deck, player, money: newMoney, bet: newBet };
-
-  if (pScore.bust) {
-    return { ...next, phase: 'finished', result: 'dealer' };
-  }
-
-  return stand(next);
-  */}
 }
 
 export function splitHand(game){
