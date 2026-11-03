@@ -7,6 +7,25 @@
   background: #050e0b;
   font-synthesis: none;
   color-scheme: dark;
+
+  /* Theme tokens from the Figma file */
+  --bg: #050e0b;
+  --felt: #0b251b;
+  --panel-top: #10302a;
+  --panel-bottom: #081a15;
+  --cream: #f4ecd6;
+  --muted: #9bb7a9;
+  --mint: #72edbe;
+  --mint-soft: #c1f4dc;
+  --mint-glow: #47deb6;
+  --ink: #07261b;
+  --gold: #f2d388;
+  --gold-deep: #c9a45c;
+  --gold-line: rgba(201, 164, 92, 0.45);
+  --line-green: #315949;
+  --danger: #f08a77;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --radius-card: 14px;
 }
 
 * {
@@ -764,4 +783,180 @@ footer button {
   display: block;
   width: 100%;
   box-sizing: border-box;
+}
+
+/* Live connection status (shown only while reconnecting) */
+.connection-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #f2d388;
+  border: 1px solid #605d35;
+  border-radius: 25px;
+  padding: 6px 14px;
+  background: #0b251bcc;
+  white-space: nowrap;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f2d388;
+  animation: connection-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes connection-pulse {
+  50% { opacity: .3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connection-dot { animation: none; }
+}
+
+/* Login / Sign up (Figma 3:659, 3:711) */
+.auth-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 820fr) minmax(340px, 642fr);
+  gap: 42px;
+  min-height: min(834px, calc(100vh - 140px));
+}
+
+.auth-table {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--gold-line);
+  border-radius: 18px;
+  background: url('/assets/imgTable.png') center / 100% 100%;
+  box-shadow: 0 24px 35px #0006;
+}
+
+.auth-tagline {
+  position: absolute;
+  top: 11%;
+  left: 40px;
+  margin: 0;
+  font: 600 48px/1.15 var(--font-display);
+  color: var(--cream);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.auth-cards {
+  position: absolute;
+  top: 41%;
+  left: 26%;
+  display: flex;
+  gap: 20px;
+}
+
+.auth-cards .card + .card {
+  margin-top: 26px;
+}
+
+/* Plain background: the decorative .panel image is sized for the narrow sidebar */
+.auth-panel {
+  background: linear-gradient(140deg, #12372c, #061710);
+  border: 1px solid #4d6043;
+  box-shadow: 0 24px 35px #0006;
+  padding: 50px 48px 36px;
+}
+
+.auth-panel h1 {
+  font-size: 37px;
+  margin: 0 0 32px;
+}
+
+.auth-panel form {
+  gap: 18px;
+}
+
+.auth-panel form label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.auth-panel form input {
+  height: 56px;
+  padding: 0 16px;
+  font: 18px Inter, Arial, sans-serif;
+  color: var(--mint-soft);
+  background: linear-gradient(#0d2b22, #061a14);
+  border: 1px solid #5d5e35;
+  border-radius: 10px;
+}
+
+.auth-panel form input::placeholder {
+  color: #c1f4dc99;
+}
+
+.auth-panel form input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.auth-panel form .primary {
+  min-height: 54px;
+  margin-top: 4px;
+}
+
+.auth-guest {
+  margin-top: 16px;
+  min-height: 54px;
+}
+
+.auth-note {
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+
+/* Pushes the log in / sign up switch to the bottom of the panel */
+.auth-switch {
+  margin-top: auto;
+  min-height: 54px;
+}
+
+.auth-layout .wide + .wide {
+  margin-top: 0;
+}
+
+@media (max-width: 900px) {
+  .auth-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    min-height: 0;
+  }
+
+  .auth-table {
+    height: 220px;
+  }
+
+  .auth-tagline {
+    top: 24px;
+    left: 20px;
+    font-size: 30px;
+  }
+
+  .auth-cards {
+    top: auto;
+    bottom: -40px;
+    left: auto;
+    right: 24px;
+    transform: scale(0.7);
+    transform-origin: bottom right;
+  }
+
+  .auth-panel {
+    padding: 28px 20px;
+  }
+
+  .auth-panel h1 {
+    font-size: 30px;
+    margin-bottom: 20px;
+  }
+
+  .auth-switch {
+    margin-top: 24px;
+  }
 }

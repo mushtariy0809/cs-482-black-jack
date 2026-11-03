@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { startGame, dealRound, hit, stand, doubleDown, splitHand, scoreHand } from './blackjack.js';
+import Lobby from './lobby/Lobby.jsx';
+import CreateTable from './lobby/CreateTable.jsx';
+import ConnectionPill from './realtime/ConnectionPill.jsx';
+import { startTables, leaveTable, setInHand } from './realtime/useTables.js';
 import './styles.css';
 
 const ASSETS = '/assets/';
@@ -180,7 +184,7 @@ function Tutorial({ onStart, onClose }) {
 
 
 
-function Game({game,setGame,player,historySaved, bet, setBet}) {
+function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The Green Room'}) {
 
   useEffect(() => {
     if (
@@ -234,7 +238,7 @@ function Game({game,setGame,player,historySaved, bet, setBet}) {
  const p=scoreHand(game.player), d=scoreHand(game.dealer);
  const finished=game.phase==='finished';
  const messages={player:'You win.',dealer:'Dealer wins.',push:'Push. It’s a tie.'};
- return <><h1>The Green Room</h1><div className="layout"><section className="table game-table" aria-label="Practice table"><div className="hand"><span className="pill">Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}</span><div className="cards">{game.dealer.map((c,i)=><Card key={c.id} card={c} hidden={!finished&&i===1}/>)}</div></div><div className="table-message" role="status">{game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}</div><div className="hand"><div className="cards">{game.player.map(c=><Card key={c.id} card={c}/>)}</div><span className="pill">Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</span></div></section><aside className="panel game-panel"><span className="eyebrow">PRACTICE HAND</span>
+ return <><h1>{tableName}</h1><div className="layout"><section className="table game-table" aria-label="Practice table"><div className="hand"><span className="pill">Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}</span><div className="cards">{game.dealer.map((c,i)=><Card key={c.id} card={c} hidden={!finished&&i===1}/>)}</div></div><div className="table-message" role="status">{game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}</div><div className="hand"><div className="cards">{game.player.map(c=><Card key={c.id} card={c}/>)}</div><span className="pill">Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</span></div></section><aside className="panel game-panel"><span className="eyebrow">PRACTICE HAND</span>
  
  <div style={{ marginBottom: '16px'}}>
   <span className="pill" style={{ fontSize: '15px', color: '#f2d388'}}>
@@ -404,7 +408,7 @@ function Game({game,setGame,player,historySaved, bet, setBet}) {
                               <footer><span>Single deck · Dealer stands on soft 17 · Practice only</span></footer></>;
 }
 
-function AuthScreen({ mode, setMode, onSuccess, onBack }) {
+function AuthScreen({ mode, setMode, onSuccess, onGuest }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -453,15 +457,19 @@ function AuthScreen({ mode, setMode, onSuccess, onBack }) {
     }
   }
 
+  // Layout from the Figma Login (3:659) and Sign up (3:711) frames
   return (
-    <section className="panel">
-      <span className="eyebrow">WELCOME TO 21 CLUB</span>
-      <h1>{mode === 'register' ? 'Create your account.' : 'Welcome back.'}</h1>
-      <p>
-        {mode === 'register'
-          ? 'Join the club and save your player account.'
-          : 'Log in to take your seat at the table.'}
-      </p>
+    <div className="auth-layout">
+      <section className="auth-table" aria-hidden="true">
+        <p className="auth-tagline">A good hand.<br />Better company.</p>
+        <div className="auth-cards">
+          <Card card={lessons[0].cards[0]} />
+          <Card card={lessons[0].cards[1]} />
+        </div>
+      </section>
+
+    <section className="panel auth-panel">
+      <h1>{mode === 'register' ? 'Join the club.' : 'Welcome back.'}</h1>
 
       <form onSubmit={handleSubmit}>
         {mode === 'register' && (
@@ -472,7 +480,7 @@ function AuthScreen({ mode, setMode, onSuccess, onBack }) {
               onChange={e => setUsername(e.target.value)}
               required
               autoComplete="username"
-              placeholder="Choose a username"
+              placeholder="Choose your name"
             />
           </label>
         )}
@@ -502,7 +510,7 @@ function AuthScreen({ mode, setMode, onSuccess, onBack }) {
           />
         </label>
 
-        {message && <p role="alert">{message}</p>}
+        {message && <p className="form-error" role="alert">{message}</p>}
 
         <button className="primary wide" type="submit" disabled={loading}>
           {loading
@@ -513,22 +521,27 @@ function AuthScreen({ mode, setMode, onSuccess, onBack }) {
         </button>
       </form>
 
+      <button className="wide auth-guest" onClick={onGuest}>
+        Play as guest
+      </button>
+      <p className="auth-note">Guest progress is saved for this session only.</p>
+
       <button
-        className="wide"
+        className="wide auth-switch"
         onClick={() => {
           setMessage('');
           setMode(mode === 'login' ? 'register' : 'login');
         }}
       >
         {mode === 'login'
-          ? 'New player? Create an account'
-          : 'Already registered? Log in'}
+          ? 'New here? Create account'
+          : 'Already a member? Log in'}
       </button>
-
-      <button className="wide" onClick={onBack}>
-        Back to home
-      </button>
+      {mode === 'register' && (
+        <p className="auth-note">Your account keeps your chips and game history.</p>
+      )}
     </section>
+    </div>
   );
 }
 
@@ -603,11 +616,62 @@ export default function App() {
  const [bet, setBet] = useState(10);
  const historySaved = useRef(new Set());
  const main=useRef(null);
+ // Table the player is seated at, and chips carried between tables
+ const [table, setTable] = useState(null);
+ const [chips, setChips] = useState(1000);
+ // Lobby opens on this table with this message (used after creating a table as dealer)
+ const [lobbyFocus, setLobbyFocus] = useState({ tableId: null, notice: '' });
  useEffect(()=>{main.current?.focus();},[screen]);
+ useEffect(() => {
+  if (game) setChips(game.money);
+ }, [game?.money]);
+
+ // Tell the lobby when a hand is in progress (shows the table as "In game")
+ const inHand = screen === 'game' && Boolean(game) && game.phase !== 'ready' && game.phase !== 'finished';
+ useEffect(() => {
+  if (table) setInHand(inHand);
+ }, [inHand, table]);
+
 //  function begin(){setGame(startGame());setScreen('game');}
 function begin(){
   setAuthMode('login');
   setScreen('auth');
+}
+
+// Where "Play" and the logo lead
+function home() {
+  setScreen(game ? 'game' : player ? 'lobby' : 'start');
+}
+
+function enterLobby(newPlayer) {
+  setPlayer(newPlayer);
+  startTables(newPlayer.name);
+  setScreen('lobby');
+}
+
+function created(result) {
+  if (result.seat !== null) {
+    sitAt(result.table);
+    return;
+  }
+  // Dealer controls aren't built yet, so a dealer waits in the lobby on their table
+  setLobbyFocus({ tableId: result.table.id, notice: `You're the dealer at ${result.table.name}.` });
+  setScreen('lobby');
+}
+
+function sitAt(joinedTable) {
+  setLobbyFocus({ tableId: null, notice: '' });
+  setTable(joinedTable);
+  setGame(startGame(chips));
+  setScreen('game');
+}
+
+// Leaving mid-hand loses the bet: it was already taken when the hand was dealt
+function exitTable() {
+  leaveTable();
+  setTable(null);
+  setGame(null);
+  setScreen('lobby');
 }
 
 
@@ -619,7 +683,7 @@ return (
         href="#"
         onClick={e => {
           e.preventDefault();
-          setScreen('start');
+          home();
         }}
       >
         <img src={ASSETS + 'imgSuitS.svg'} alt="" />
@@ -628,7 +692,7 @@ return (
       <nav aria-label="Main navigation">
         <button
           className={screen !== 'tutorial' && screen !== 'history' ? 'active' : ''}
-          onClick={() => setScreen(game ? 'game' : 'start')}
+          onClick={home}
         >
           Play
         </button>
@@ -650,12 +714,10 @@ return (
 
       </nav>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginleft: 'auto'}}>
+        <ConnectionPill />
         {screen == 'game' && (
           <button
-            onClick={() => {
-              setGame(null);
-              setScreen('start');
-            }}
+            onClick={exitTable}
             style={{
               background: '#8a150c',
               color: 'white',
@@ -670,41 +732,51 @@ return (
             Exit Game
           </button>
         )}
-      <span className="practice-tag">Practice mode</span>
+      {player ? (
+        <span className="chips-counter">{chips.toLocaleString()} chips</span>
+      ) : (
+        <span className="practice-tag">Practice mode</span>
+      )}
       </div>
     </header>
 
     <main ref={main} tabIndex="-1">
       {screen === 'auth' ? (
-        <div className="layout">
-          <AuthScreen
-            mode={authMode}
-            setMode={setAuthMode}
-            onSuccess={loggedInPlayer => {
-              setPlayer({
-                type: 'registered',
-                name: loggedInPlayer.name,
-                id: loggedInPlayer.id,
-                email: loggedInPlayer.email
-              });
-              setGame(startGame());
-              setScreen('game');
-            }}
-            onBack={() => setScreen('start')}
-          />
-        </div>
+        <AuthScreen
+          mode={authMode}
+          setMode={setAuthMode}
+          onSuccess={loggedInPlayer => {
+            enterLobby({
+              type: 'registered',
+              name: loggedInPlayer.name,
+              id: loggedInPlayer.id,
+              email: loggedInPlayer.email
+            });
+          }}
+          onGuest={() => enterLobby({ type: 'guest', name: 'Guest' })}
+        />
       ) : screen === 'tutorial' ? (
         <Tutorial
           onStart={begin}
-          onClose={() => setScreen(game ? 'game' : 'start')}
+          onClose={home}
         />
-      ) : screen === 'game' ? (
-        <Game game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet}/>
+      ) : screen === 'lobby' && player ? (
+        <Lobby
+          key={lobbyFocus.tableId ?? 'lobby'}
+          onJoined={sitAt}
+          onCreate={() => setScreen('create')}
+          focusTableId={lobbyFocus.tableId}
+          notice={lobbyFocus.notice}
+        />
+      ) : screen === 'create' && player ? (
+        <CreateTable onCreated={created} onCancel={() => setScreen('lobby')} />
+      ) : screen === 'game' && game ? (
+        <Game game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet} tableName={table?.name}/>
       ) : screen === 'history' && player?.type === 'registered' ? (
         <HistoryScreen
           player={player}
-          onBack={() => setScreen(game ? 'game' : 'start')}
-        />  
+          onBack={home}
+        />
       ) : (
         <>
           <h1>A good hand. Better company.</h1>
@@ -730,11 +802,7 @@ return (
 
               <button
                 className="wide"
-                onClick={() => {
-                  setPlayer({ type: 'guest', name: 'Guest' });
-                  setGame(startGame());
-                  setScreen('game');
-                }}
+                onClick={() => enterLobby({ type: 'guest', name: 'Guest' })}
               >
                 Continue as Guest
               </button>

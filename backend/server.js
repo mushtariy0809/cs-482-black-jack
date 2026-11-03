@@ -6,9 +6,16 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const mongoose = require('mongoose');
+const http = require('http');
+const { Server } = require('socket.io');
+const { startRealtime } = require('./realtime');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Express and Socket.IO share one HTTP server (and one port)
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json());
@@ -28,10 +35,13 @@ app.listen(PORT, () => {
 // Connect to MongoDB
 
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
+  .then(async () => {
     console.log('MongoDB connected successfully!');
 
-    app.listen(PORT, () => {
+    // Live tables (lobby status, seats) over Socket.IO
+    await startRealtime(io);
+
+    server.listen(PORT, () => {
       console.log(`21 CLUB backend running on port ${PORT}`);
     });
   })
