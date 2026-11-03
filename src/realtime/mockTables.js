@@ -9,7 +9,6 @@ function table(fields) {
     maxSeats: 5,
     players: 0,
     seats: [],
-    dealer: null,
     minBet: 10,
     maxBet: 500,
     status: 'waiting',
@@ -55,9 +54,9 @@ export function mockAction(event, payload, tables) {
       name,
       visibility: payload.visibility ?? 'public',
       mode: payload.mode ?? 'people',
-      players: payload.seat === 'dealer' ? 0 : 1
+      players: 1
     });
-    return { ok: true, table: created, inviteCode: 'DEMO00', seat: payload.seat === 'dealer' ? null : 0 };
+    return { ok: true, table: created, inviteCode: 'DEMO00', seat: 0 };
   }
 
   return { ok: true };

@@ -1,7 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { startGame, dealRound, hit, stand, doubleDown, splitHand, scoreHand } from './blackjack.js';
 import Lobby from './lobby/Lobby.jsx';
 import CreateTable from './lobby/CreateTable.jsx';
+import TableBar from './table/TableBar.jsx';
+import LeaveConfirm from './table/LeaveConfirm.jsx';
+import TableFx, { DealtCard, ScorePill, dealDelay } from './table/TableFx.jsx';
+import PracticeRound from './tutorial/PracticeRound.jsx';
+import TableAds from './table/TableAds.jsx';
+import SoundButton from './sound/SoundButton.jsx';
+import { installUiSounds, preload, setMusic } from './sound/SoundManager.js';
 import ConnectionPill from './realtime/ConnectionPill.jsx';
 import { startTables, leaveTable, setInHand } from './realtime/useTables.js';
 import './styles.css';
@@ -89,102 +97,7 @@ function Card({ card, hidden = false }) {
   );
 }
 
-function Tutorial({ onStart, onClose }) {
-  const [step, setStep] = useState(-1);
-  const lesson = lessons[step];
-
-  return (
-    <>
-      <h1>Your first hand.</h1>
-
-      <div className="layout">
-        <section className="table tutorial-table" aria-label="Blackjack tutorial">
-          <div className="lesson-cards">
-            {(lesson?.cards || lessons[0].cards).map((c, i) => (
-              <Card key={i} card={c} />
-            ))}
-          </div>
-
-          <div className="lesson-controls" aria-live="polite">
-            {lesson ? (
-              <div className="lesson-copy">
-                <h2>{lesson.title}</h2>
-                <p>{lesson.text}</p>
-                <strong>{lesson.note}</strong>
-
-                <div className="lesson-nav">
-                  <button disabled={step === 0} onClick={() => setStep(step - 1)}>
-                    Back
-                  </button>
-
-                  <span>
-                    {step + 1} / {lessons.length}
-                  </span>
-
-                  <button
-                    className="primary"
-                    onClick={() => (step === 3 ? onStart() : setStep(step + 1))}
-                  >
-                    {step === 3 ? 'Start the game' : 'Next →'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <button className="primary watch" onClick={() => setStep(0)}>
-                  ▶ Start tutorial
-                </button>
-                <span className="pill">4 short lessons · Read at your pace</span>
-              </>
-            )}
-          </div>
-        </section>
-
-        <aside className="panel">
-          <h2>Three things to know</h2>
-
-          <ol className="tips">
-            <li>
-              <div>
-                <span className="number">01</span>
-                <h3>Get close to 21</h3>
-              </div>
-              <p>Without going over.</p>
-            </li>
-            <li>
-              <div>
-                <span className="number">02</span>
-                <h3>Hit or stand</h3>
-              </div>
-              <p>Take a card or keep your hand.</p>
-            </li>
-            <li>
-              <div>
-                <span className="number">03</span>
-                <h3>Beat the dealer</h3>
-              </div>
-              <p>The best hand wins. Equal totals push.</p>
-            </li>
-          </ol>
-
-          <button className="primary wide" onClick={onStart}>
-            Start the game
-          </button>
-        </aside>
-      </div>
-
-      <footer>
-        <span>Practice mode · No bets or saved history</span>
-        <button onClick={onClose}>Close tutorial</button>
-      </footer>
-    </>
-  );
-}
-
-
-
-
-function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The Green Room'}) {
+function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The Green Room', toolbar, onChangeTable}) {
 
   useEffect(() => {
     if (
@@ -238,174 +151,111 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
  const p=scoreHand(game.player), d=scoreHand(game.dealer);
  const finished=game.phase==='finished';
  const messages={player:'You win.',dealer:'Dealer wins.',push:'Push. It’s a tie.'};
- return <><h1>{tableName}</h1><div className="layout"><section className="table game-table" aria-label="Practice table"><div className="hand"><span className="pill">Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}</span><div className="cards">{game.dealer.map((c,i)=><Card key={c.id} card={c} hidden={!finished&&i===1}/>)}</div></div><div className="table-message" role="status">{game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}</div><div className="hand"><div className="cards">{game.player.map(c=><Card key={c.id} card={c}/>)}</div><span className="pill">Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</span></div></section><aside className="panel game-panel"><span className="eyebrow">PRACTICE HAND</span>
- 
- <div style={{ marginBottom: '16px'}}>
-  <span className="pill" style={{ fontSize: '15px', color: '#f2d388'}}>
-    Money: ${game.money}
-  </span>
-</div>
+ const activeHand = game.hands?.[game.activeHandIndex];
+ const reduceMotion = useReducedMotion();
 
- <h2>{game.phase==='ready'?'Take your seat.':'Learn as you play.'}</h2>
- <p>This practice area lets you check the game rules before the team connects betting and the final controls.</p>
- <div className="rule-list">
-  <p>
-    <strong>Number cards</strong>
-    <span>Face value</span>
-    </p>
-    <p>
-      <strong>J, Q, K</strong>
-      <span>10 points</span>
-      </p>
-      <p>
-        <strong>Ace</strong>
-        <span>1 or 11 points</span>
-        </p>
-        <p>
-          <strong>Dealer</strong>
-          <span>Stands on all 17s</span>
-          </p>
-          </div>
-          <div className="practice-controls">
-            {game.phase==='ready'? (
-              <>
-            <div style={{ marginButton: '12px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap'}}>
-              <span style={{ fontSize: '13px', fontWeight: 'bold', width: '100%', marginBottom: '4px'}}>Select Bet:</span>
-              {[5,10,25,50,100].map((amount) => ( 
-                <button 
-                key={amount} 
-                className={bet==amount ? 'primary' : ''}
-                style={{ padding: '4px 10px', fontSize: '12px', flex: '1'}}
-                onClick={() => setBet(amount)}
-                disabled={amount > game.money}
-                >
-                ${amount}
-                </button>
-              ))}
-            </div>
-            
-            <button className="primary wide" 
-            onClick={()=>setGame(dealRound(game, bet))}
-            disabled={bet > game.money || game.money <=0}
-            >
-              Deal hand (${bet})
-              </button>
-              </>
-            ) : finished ? (
-            <button 
-            className="primary wide" 
-            onClick={()=>setGame(startGame(game.money))}
-            >
-              Start a fresh game
-              </button>
-            ) : (
-              <>
-            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%', marginBottom: '8px'}}>
-            <button 
-            className="Wide"
-            disabled={game.player.length !==2 || game.money < game.bet}
-            onClick={() =>{setGame(doubleDown(game))}}
-            >
-              Double
-              </button>
-            <button 
-            className="wide" 
-            disabled={
-              game.hands?.[game.activeHandIndex]?.cards.length !== 2 ||
-              game.hands?.[game.activeHandIndex]?.cards[0].rank !== game.hands?.[game.activeHandIndex]?.cards[1].rank || 
-              game.money < game.hands?.[game.activeHandIndex]?.bet
-            }
-            onClick={() => setGame(splitHand(game))}
-            >
-              Split
-              </button>                                
-              </div>
-            
-            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%', marginBottom: '8px'}}>
-            <button 
-            className="primary" 
-            onClick={()=>setGame(hit(game))}
-            disabled={p.bust || p.total >=21}
-            >
-              Hit
-              </button>
-            <button 
-            className="primary"
-            onClick={()=>setGame(stand(game))}
-            disabled={p.bust}
-            >
-              Stand
-              </button>
-              </div>
-              </>
-            )}
-            </div>
+ // Layout from Figma "Bet"/"Game": table with a controls bar along the bottom, ads on the right.
+ // Only the table zooms in/out between screens; the ad column never moves.
+ return <>
+  {toolbar ?? <h1>{tableName}</h1>}
+  <div className="game-layout">
+   <motion.div
+    className="game-stage"
+    initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.94 }}
+    animate={{ opacity: 1, scale: 1 }}
+    exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.82 }}
+    transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+   >
+    <section className="table game-table" aria-label="Blackjack table">
+     <TableFx game={game} bet={bet}/>
+     <div className="hand">
+      <ScorePill>Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}</ScorePill>
+      <div className="cards">{game.dealer.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} hidden={!finished&&i===1} delay={dealDelay('dealer',i)}/>)}</div>
+     </div>
+     <div className="table-message" role="status">{game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}</div>
+     <div className="hand">
+      <div className="cards">{game.player.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} delay={dealDelay('player',i)}/>)}</div>
+      <ScorePill>Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</ScorePill>
+     </div>
 
-            </aside>
-            </div>
-            <footer>
-              <span>Single deck · Dealer stands on soft 17 · Practice only</span>
-              </footer></>;
-
-
- return <><h1>The Green Room</h1>
- {player && <p>Welcome, {player.name}!</p>}
- <div className="layout">
-  <section className="table game-table" aria-label="Practice table">
-  <div className="hand">
-    <span className="pill">
-      Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}
-      </span>
-      <div className="cards">
-        {game.dealer.map((c,i)=><Card key={c.id} card={c} hidden={!finished&&i===1}/>)}
+     {/* Controls bar (practice-controls: these buttons make card/chip sounds instead of a click) */}
+     <div className="game-controls practice-controls">
+      {game.phase==='ready' ? (
+       <>
+        <div className="controls-bet">
+         <span className="controls-label">BET</span>
+         <strong>{bet} chips</strong>
+         <span className="controls-balance">Balance {game.money.toLocaleString()}</span>
         </div>
+        <div className="controls-chips" role="group" aria-label="Select bet">
+         {[5,10,25,50,100].map(amount => (
+          <button
+           key={amount}
+           className={`chip-button chip-${amount}` + (bet==amount ? ' is-picked' : '')}
+           aria-pressed={bet==amount}
+           aria-label={`Bet ${amount}`}
+           onClick={() => setBet(amount)}
+           disabled={amount > game.money}
+          >
+           {amount}
+          </button>
+         ))}
         </div>
-        <div className="table-message" role="status">
-          {game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}
-          </div><div className="hand">
-            <div className="cards">
-              {game.player.map(c=><Card key={c.id} card={c}/>)}
-              </div>
-              <span className="pill">
-                Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}
-                </span>
-                </div>
-                </section>
-                <aside className="panel game-panel">
-                  <span className="eyebrow">PRACTICE HAND</span>
-                  <h2>{game.phase==='ready'?'Take your seat.':'Learn as you play.'}</h2>
-                  <p>This practice area lets you check the game rules before the team connects betting and the final controls.</p>
-                  <div className="rule-list">
-                    <p>
-                      <strong>Number cards</strong>
-                      <span>Face value</span>
-                      </p>
-                      <p>
-                        <strong>J, Q, K</strong>
-                        <span>10 points</span>
-                        </p>
-                        <p>
-                          <strong>Ace</strong>
-                          <span>1 or 11 points</span>
-                          </p>
-                          <p>
-                            <strong>Dealer</strong>
-                            <span>Stands on all 17s</span>
-                            </p>
-                            </div>
-                            <div className="practice-controls">
-                              {game.phase==='ready'?
-                              <button className="primary wide" onClick={()=>setGame(dealRound(game))}>Deal hand</button>:finished?
-                              <button className="primary wide" onClick={()=>setGame(startGame(game.money))}>Start a fresh game</button>:<>
-                              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%', marginBottom: '8px'}}>
-                                <button className="Wide" disabled={game.player.length !==2} onClick={() =>{}}>Double</button>
-                                <button className="wide" disabled={game.player.length !== 2 || game.player[0].rank !== game.player[1].rank} onClick={() => {}}>Split</button>                                </div>
-                              <button className="primary wide" onClick={()=>setGame(hit(game))}disabled={p.bust || p.total >=21}>Hit</button>
-                              <button className="wide" onClick={()=>setGame(stand(game))}disabled={p.bust}>Stand</button></>
-                              }</div>
-                              </aside>
-                              </div>
-                              <footer><span>Single deck · Dealer stands on soft 17 · Practice only</span></footer></>;
+        <button
+         className="primary controls-main"
+         onClick={()=>setGame(dealRound(game, bet))}
+         disabled={bet > game.money || game.money <=0}
+        >
+         Deal ({bet})
+        </button>
+       </>
+      ) : finished ? (
+       <div className="result-actions">
+        <button className="primary wide" onClick={()=>setGame(startGame(game.money))}>
+         Start a fresh game
+        </button>
+        {onChangeTable && (
+         <button className="wide" onClick={onChangeTable}>
+          Change table
+         </button>
+        )}
+       </div>
+      ) : (
+       <>
+        <button
+         disabled={game.player.length !==2 || game.money < game.bet}
+         onClick={() =>{setGame(doubleDown(game))}}
+        >
+         Double
+        </button>
+        <button
+         disabled={
+          activeHand?.cards.length !== 2 ||
+          activeHand?.cards[0].rank !== activeHand?.cards[1].rank ||
+          game.money < activeHand?.bet
+         }
+         onClick={() => setGame(splitHand(game))}
+        >
+         Split
+        </button>
+        <button className="primary controls-main" onClick={()=>setGame(hit(game))} disabled={p.bust || p.total >=21}>
+         Hit
+        </button>
+        <button className="primary controls-main" onClick={()=>setGame(stand(game))} disabled={p.bust}>
+         Stand
+        </button>
+       </>
+      )}
+     </div>
+    </section>
+   </motion.div>
+
+   <TableAds />
+  </div>
+  <footer>
+   <span>Single deck · Dealer stands on soft 17 · Balance {game.money.toLocaleString()} chips</span>
+  </footer>
+ </>;
 }
 
 function AuthScreen({ mode, setMode, onSuccess, onGuest }) {
@@ -619,8 +469,6 @@ export default function App() {
  // Table the player is seated at, and chips carried between tables
  const [table, setTable] = useState(null);
  const [chips, setChips] = useState(1000);
- // Lobby opens on this table with this message (used after creating a table as dealer)
- const [lobbyFocus, setLobbyFocus] = useState({ tableId: null, notice: '' });
  useEffect(()=>{main.current?.focus();},[screen]);
  useEffect(() => {
   if (game) setChips(game.money);
@@ -631,6 +479,24 @@ export default function App() {
  useEffect(() => {
   if (table) setInHand(inHand);
  }, [inHand, table]);
+
+ const [confirmLeave, setConfirmLeave] = useState(false);
+ // Table to join as soon as the lobby opens (tutorial's "Practice with bots")
+ const [autoJoinId, setAutoJoinId] = useState(null);
+ // Button clicks/hovers everywhere; audio starts after the first click (browser rule)
+ useEffect(() => {
+  installUiSounds();
+ }, []);
+
+ // Lounge music in the lobby, a different loop at the table and in the tutorial round
+ useEffect(() => {
+  if (screen === 'game' || screen === 'tutorial') {
+   preload('table');
+   setMusic('table');
+  } else {
+   setMusic('lobby');
+  }
+ }, [screen]);
 
 //  function begin(){setGame(startGame());setScreen('game');}
 function begin(){
@@ -649,18 +515,7 @@ function enterLobby(newPlayer) {
   setScreen('lobby');
 }
 
-function created(result) {
-  if (result.seat !== null) {
-    sitAt(result.table);
-    return;
-  }
-  // Dealer controls aren't built yet, so a dealer waits in the lobby on their table
-  setLobbyFocus({ tableId: result.table.id, notice: `You're the dealer at ${result.table.name}.` });
-  setScreen('lobby');
-}
-
 function sitAt(joinedTable) {
-  setLobbyFocus({ tableId: null, notice: '' });
   setTable(joinedTable);
   setGame(startGame(chips));
   setScreen('game');
@@ -668,11 +523,35 @@ function sitAt(joinedTable) {
 
 // Leaving mid-hand loses the bet: it was already taken when the hand was dealt
 function exitTable() {
+  setConfirmLeave(false);
   leaveTable();
   setTable(null);
   setGame(null);
   setScreen('lobby');
 }
+
+// Tutorial end buttons. Not logged in yet? Log in / play as guest first.
+function practiceWithBots() {
+  setAutoJoinId('practice');
+  if (player) setScreen('lobby');
+  else begin();
+}
+
+function findTable() {
+  if (player) setScreen('lobby');
+  else begin();
+}
+
+// Leaving between hands is free; mid-hand asks first because the bet is lost
+function requestLeave() {
+  if (inHand) setConfirmLeave(true);
+  else exitTable();
+}
+
+const stake = game?.hands?.reduce((sum, hand) => sum + hand.bet, 0) || game?.bet || 0;
+
+// The game screen zooms its table itself (see Game) so its ad column never moves
+const screenMotion = { initial: false, animate: { opacity: 1 }, exit: { opacity: 1, transition: { duration: 0 } } };
 
 
 return (
@@ -715,23 +594,7 @@ return (
       </nav>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginleft: 'auto'}}>
         <ConnectionPill />
-        {screen == 'game' && (
-          <button
-            onClick={exitTable}
-            style={{
-              background: '#8a150c',
-              color: 'white',
-              border: 'none',
-              padding: '6px 16px',
-              borderRadius: '9999px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              lineheight  : '1.5'
-            }}
-          >
-            Exit Game
-          </button>
-        )}
+        <SoundButton compact />
       {player ? (
         <span className="chips-counter">{chips.toLocaleString()} chips</span>
       ) : (
@@ -741,6 +604,8 @@ return (
     </header>
 
     <main ref={main} tabIndex="-1">
+      <AnimatePresence mode="wait">
+      <motion.div key={screen} {...screenMotion}>
       {screen === 'auth' ? (
         <AuthScreen
           mode={authMode}
@@ -756,22 +621,23 @@ return (
           onGuest={() => enterLobby({ type: 'guest', name: 'Guest' })}
         />
       ) : screen === 'tutorial' ? (
-        <Tutorial
-          onStart={begin}
-          onClose={home}
-        />
+        <PracticeRound Card={Card} onSkip={home} onPractice={practiceWithBots} onFindTable={findTable} />
       ) : screen === 'lobby' && player ? (
         <Lobby
-          key={lobbyFocus.tableId ?? 'lobby'}
           onJoined={sitAt}
           onCreate={() => setScreen('create')}
-          focusTableId={lobbyFocus.tableId}
-          notice={lobbyFocus.notice}
+          autoJoinId={autoJoinId}
+          onAutoJoinHandled={() => setAutoJoinId(null)}
         />
       ) : screen === 'create' && player ? (
-        <CreateTable onCreated={created} onCancel={() => setScreen('lobby')} />
+        <CreateTable onCreated={result => sitAt(result.table)} onCancel={() => setScreen('lobby')} />
       ) : screen === 'game' && game ? (
-        <Game game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet} tableName={table?.name}/>
+        <Game
+          game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet}
+          tableName={table?.name}
+          toolbar={table && <TableBar table={table} onLeave={requestLeave} />}
+          onChangeTable={table ? exitTable : undefined}
+        />
       ) : screen === 'history' && player?.type === 'registered' ? (
         <HistoryScreen
           player={player}
@@ -817,7 +683,15 @@ return (
           </div>
         </>
       )}
+      </motion.div>
+      </AnimatePresence>
     </main>
+
+    <AnimatePresence>
+      {confirmLeave && (
+        <LeaveConfirm stake={stake} onConfirm={exitTable} onCancel={() => setConfirmLeave(false)} />
+      )}
+    </AnimatePresence>
   </>
 );
 

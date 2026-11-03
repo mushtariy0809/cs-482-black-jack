@@ -31,7 +31,6 @@ function mongoPersistence() {
         solo: table.solo,
         maxSeats: table.maxSeats,
         seats: table.seats,
-        dealer: table.dealer,
         minBet: table.minBet,
         maxBet: table.maxBet,
         status: table.status,

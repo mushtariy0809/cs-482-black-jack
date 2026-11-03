@@ -4,7 +4,7 @@
 // client -> server (all take an optional ack callback that gets { ok, ...result } or { ok: false, code, message })
 //   lobby:subscribe              start receiving table events, replies with tables:snapshot
 //   lobby:unsubscribe
-//   table:create  { name, visibility, password?, mode, seat }
+//   table:create  { name, visibility, password?, mode }   creator is seated as a player
 //   table:join    { tableId } or { inviteCode }, plus password? for private tables
 //   table:leave                  seat is held for 10 seconds
 //   seat:hand     { inHand }     the player's hand started or ended

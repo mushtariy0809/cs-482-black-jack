@@ -138,8 +138,9 @@ test('empty player tables are cleaned up, system tables are not', async () => {
   const removed = [];
   store.on('removed', id => removed.push(id));
 
-  const { table } = await store.create({ name: 'Short Lived', seat: 'dealer' }, alice);
+  const { table } = await store.create({ name: 'Short Lived' }, alice);
   store.leave(alice.clientId);
+  store.releaseSeat(table.id, alice.clientId);
 
   clock += IDLE_TABLE_MS;
   store.sweepIdle();

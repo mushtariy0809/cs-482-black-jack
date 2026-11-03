@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { AnimatePresence, animate, motion, useAnimationControls, useMotionValue, useReducedMotion } from 'framer-motion';
 import { StatusBadge, TableIcons, betText, seatText } from './tableInfo.jsx';
+import { play } from '../sound/SoundManager.js';
 
 const TABLE_IMAGE = '/assets/imgTable.png';
 // Slides further than this from the center are not rendered
@@ -26,7 +27,8 @@ function placement(offset, reduceMotion) {
 
 const slideSpring = { type: 'spring', stiffness: 140, damping: 22, mass: 0.9 };
 
-export default function TableCarousel({ tables, activeId, onActiveChange, onJoin, joiningId, keyboardEnabled }) {
+// divingId: a table you just joined. The camera dives into it before the table screen opens.
+export default function TableCarousel({ tables, activeId, onActiveChange, onJoin, joiningId, keyboardEnabled, divingId }) {
   const reduceMotion = useReducedMotion();
   const camera = useAnimationControls();
   const dragX = useMotionValue(0);
@@ -36,6 +38,7 @@ export default function TableCarousel({ tables, activeId, onActiveChange, onJoin
   const active = tables[index];
 
   function bump(direction) {
+    play('bump');
     if (reduceMotion) return;
     camera.start({ x: [0, direction * -16, direction * 6, 0], transition: { duration: 0.35, ease: 'easeOut' } });
   }
@@ -50,11 +53,18 @@ export default function TableCarousel({ tables, activeId, onActiveChange, onJoin
     if (next === index) return;
 
     onActiveChange(tables[next].id);
+    play('swoosh');
     // Slight camera push-in as the table swings to the center
     if (!reduceMotion) {
       camera.start({ scale: [1, 1.03, 1], transition: { duration: 0.6, ease: 'easeOut' } });
     }
   }
+
+  // Joining: fly into the table you picked
+  useEffect(() => {
+    if (!divingId || reduceMotion) return;
+    camera.start({ scale: 2.2, opacity: 0, transition: { duration: 0.45, ease: [0.4, 0, 1, 1] } });
+  }, [divingId]);
 
   // Keyboard arrows (ignored while typing or when a dialog is open)
   const goRef = useRef(go);
@@ -86,6 +96,7 @@ export default function TableCarousel({ tables, activeId, onActiveChange, onJoin
     <section className="carousel" aria-roledescription="carousel" aria-label="Tables">
       <button
         className="carousel-arrow carousel-prev"
+        data-sound="none"
         aria-label="Previous table"
         aria-disabled={atStart}
         onClick={() => go(index - 1)}
@@ -110,6 +121,14 @@ export default function TableCarousel({ tables, activeId, onActiveChange, onJoin
           }, 0);
         }}
       >
+        {/* Arriving in the lobby, the camera pulls back from the table into the carousel.
+            Plays every time the carousel appears; it stays inside the clipped stage, so the ads never move. */}
+        <motion.div
+          className="carousel-intro"
+          initial={reduceMotion ? false : { scale: 1.35, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        >
         <motion.div className="carousel-camera" animate={camera}>
           <motion.div className="carousel-track" style={{ x: dragX }}>
             <AnimatePresence>
@@ -160,6 +179,7 @@ export default function TableCarousel({ tables, activeId, onActiveChange, onJoin
 
                         <button
                           className="primary join-button"
+                          data-sound="none"
                           disabled={table.status === 'full' || joining}
                           onClick={event => {
                             event.stopPropagation();
@@ -178,10 +198,12 @@ export default function TableCarousel({ tables, activeId, onActiveChange, onJoin
             </AnimatePresence>
           </motion.div>
         </motion.div>
+        </motion.div>
       </motion.div>
 
       <button
         className="carousel-arrow carousel-next"
+        data-sound="none"
         aria-label="Next table"
         aria-disabled={atEnd}
         onClick={() => go(index + 1)}

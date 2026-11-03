@@ -69,10 +69,6 @@ const tableSchema = new mongoose.Schema({
     default: 5
   },
   seats: [seatSchema],
-  dealer: {
-    clientId: String,
-    name: String
-  },
   minBet: {
     type: Number,
     default: 10

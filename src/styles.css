@@ -125,6 +125,8 @@ nav {
 
 nav button {
   border: 0;
+  /* Same 3px underline space on every tab, so the selected one doesn't sit higher */
+  border-bottom: 3px solid transparent;
   border-radius: 0;
   background: none;
   font-size: 16px;
@@ -685,16 +687,18 @@ header {
   background-position: center;
 }
 
+/* Plain gradient + glow: the imgPanel9.svg export drew its shape lower than the
+   button, leaving a dark strip and a double edge along the bottom. */
 .watch {
-  background-image: url('/assets/imgPanel9.svg');
-  background-size: calc(100% + 37px) calc(100% + 37px);
-  background-position: center;
+  background: linear-gradient(#a4ffdb, #35c698);
+  box-shadow: 0 6px 18px rgba(71, 222, 182, 0.3);
 }
 
+/* Plain gradient + glow: the imgPanel13.svg export drew its shape 6px lower than the
+   button, leaving a dark strip along the bottom edge. */
 .panel > .primary {
-  background-image: url('/assets/imgPanel13.svg');
-  background-size: calc(100% + 37px) calc(100% + 37px);
-  background-position: center;
+  background: linear-gradient(#a4ffdb, #35c698);
+  box-shadow: 0 6px 18px rgba(71, 222, 182, 0.3);
 }
 
 .pill {

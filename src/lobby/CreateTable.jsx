@@ -39,11 +39,11 @@ function Choice({ label, options, value, onChange }) {
   );
 }
 
-// onCreated(result) gets the server reply: { table, seat, role }
+// onCreated(result) gets the server reply: { table, seat }.
+// The creator always sits as a player; the dealer is always a bot.
 export default function CreateTable({ onCreated, onCancel }) {
   const [name, setName] = useState('');
   const [mode, setMode] = useState('people');
-  const [seat, setSeat] = useState('player');
   const [touched, setTouched] = useState(false);
   const [nameError, setNameError] = useState('');
   const [formError, setFormError] = useState('');
@@ -68,7 +68,7 @@ export default function CreateTable({ onCreated, onCancel }) {
     }
 
     setBusy(true);
-    const result = await createTable({ name: name.trim(), mode, seat });
+    const result = await createTable({ name: name.trim(), mode });
     setBusy(false);
 
     if (!result.ok) {
@@ -90,7 +90,7 @@ export default function CreateTable({ onCreated, onCancel }) {
     name: name.trim() || 'Your table',
     visibility: 'public',
     mode,
-    players: seat === 'player' ? 1 : 0,
+    players: 1,
     status: 'waiting',
     ...DEFAULT_BETS
   };
@@ -145,16 +145,6 @@ export default function CreateTable({ onCreated, onCancel }) {
             ]}
           />
 
-          <Choice
-            label="Your seat"
-            value={seat}
-            onChange={setSeat}
-            options={[
-              { value: 'player', label: 'Player' },
-              { value: 'dealer', label: 'Dealer' }
-            ]}
-          />
-
           {formError && <p className="form-error" role="alert">{formError}</p>}
 
           <button type="submit" className="primary wide setup-submit" disabled={busy}>
@@ -180,7 +170,7 @@ export default function CreateTable({ onCreated, onCancel }) {
             </div>
           </div>
           <p className="setup-hint">
-            Public table · anyone in the lobby can join. Up to {MAX_SEATS} players plus the dealer.
+            Public table · anyone in the lobby can join. Up to {MAX_SEATS} players, and the dealer is always a bot.
           </p>
         </aside>
       </div>

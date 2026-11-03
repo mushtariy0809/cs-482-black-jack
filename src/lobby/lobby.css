@@ -340,6 +340,7 @@
   grid-column: 1 / -1;
 }
 
+.carousel-intro,
 .carousel-camera,
 .carousel-track {
   position: absolute;
@@ -636,14 +637,6 @@
   }
 }
 
-.lobby-notice {
-  margin: 0;
-  flex: 1 1 200px;
-  text-align: center;
-  font-size: 14px;
-  color: var(--gold);
-}
-
 /* Create table (Figma 3:78) */
 
 .setup-title {
@@ -825,4 +818,53 @@
 
 .all-tables-count {
   display: inline-block;
+}
+
+/* Held seat countdown in the hero */
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.countdown {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+}
+
+.countdown svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.countdown-track {
+  fill: #03100ccc;
+  stroke: #ffffff1f;
+  stroke-width: 4;
+}
+
+.countdown-ring {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(242, 211, 136, 0.6));
+}
+
+.countdown-number {
+  position: relative;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-number.is-urgent {
+  color: var(--danger);
 }

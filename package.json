@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node --experimental-test-coverage --test src/blackjack.test.js"
+    "test": "node --experimental-test-coverage --test src/blackjack.test.js src/tutorial/riggedDeck.test.js"
   },
   "dependencies": {
     "framer-motion": "^14.9.0",
+    "howler": "^2.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "socket.io-client": "^4.8.4"

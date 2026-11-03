@@ -2,17 +2,19 @@ import React from 'react';
 
 // Ad slots from the Figma lobby. Fixed size, never animated or overlapped:
 // the app makes money from these, so keep their position and size stable.
-const ADS = [
+export const ADS = [
   {
     id: 'shareair',
     image: '/assets/ads/ad-shareair.png',
     title: 'Your food stinks.',
+    tableTitle: 'Your food stinks.',
     text: 'Secondhand smoke is costing restaurants guests.'
   },
   {
     id: 'social',
     image: '/assets/ads/ad-social.png',
     title: 'Boost your social presence.',
+    tableTitle: 'Boost your reach.',
     text: 'Captivate audiences with social media magic.'
   }
 ];

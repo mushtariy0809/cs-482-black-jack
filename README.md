@@ -13,7 +13,7 @@ A multiplayer blackjack web application where users can play with friends or bot
 - **Accounts and guest access:** Register, log in, or play as a guest. New accounts receive a virtual-money bonus.
 - **Game lobby:** View active tables, buy-in amounts, available seats, and game status.
 - **Custom tables:** Create public or password-protected tables, invite friends, and add bots.
-- **Dealer options:** The table creator is the default dealer, with an option to change the dealer or use a bot.
+- **Dealer:** The dealer is always a bot. Players, including the table creator, cannot be the dealer (clarified with the professor).
 - **Social features:** Friend lists, invitations, table chat, and private messages.
 - **Player profiles:** Avatars, virtual-money balances, and game history.
 - **Tutorial:** A skippable video tutorial that players can watch again.

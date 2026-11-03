@@ -8,17 +8,19 @@ import TableCarousel from './TableCarousel.jsx';
 import AllTablesDropdown from './AllTablesDropdown.jsx';
 import PasswordPrompt from './PasswordPrompt.jsx';
 import { readLastTable, saveLastTable } from './lastTable.js';
+import { play, preload } from '../sound/SoundManager.js';
 import './lobby.css';
 
 // onJoined(table) is called after the server gives us a seat.
-// focusTableId opens the carousel on that table; notice is a one-line message above it.
-export default function Lobby({ onJoined, onCreate, focusTableId = null, notice = '' }) {
+// autoJoinId joins that table as soon as it shows up (tutorial's "Practice with bots").
+export default function Lobby({ onJoined, onCreate, autoJoinId = null, onAutoJoinHandled }) {
   const { tables, reservation } = useTables();
   const [filter, setFilter] = useState('all');
-  const [activeId, setActiveId] = useState(focusTableId);
+  const [activeId, setActiveId] = useState(null);
   const [joiningId, setJoiningId] = useState(null);
   const [passwordFor, setPasswordFor] = useState(null);
   const [error, setError] = useState('');
+  const [divingId, setDivingId] = useState(null);
   const lastIndex = useRef(0);
 
   const shown = useMemo(
@@ -62,9 +64,25 @@ export default function Lobby({ onJoined, onCreate, focusTableId = null, notice 
 
     saveLastTable(table.id);
     setPasswordFor(null);
-    onJoined(result.table);
+    play('seatJoin');
+    preload('table');
+    // Let the camera dive into the table first (instant with reduced motion)
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    setDivingId(table.id);
+    setTimeout(() => onJoined(result.table), reduceMotion ? 0 : 450);
     return null;
   }
+
+  const autoJoined = useRef(false);
+  useEffect(() => {
+    if (!autoJoinId || autoJoined.current) return;
+    const table = tables.find(t => t.id === autoJoinId);
+    if (!table) return;
+    autoJoined.current = true;
+    onAutoJoinHandled?.();
+    setActiveId(table.id);
+    requestJoin(table);
+  }, [autoJoinId, tables]);
 
   async function requestJoin(table) {
     setError('');
@@ -115,7 +133,6 @@ export default function Lobby({ onJoined, onCreate, focusTableId = null, notice 
           </div>
 
           {error && <p className="form-error lobby-error" role="alert">{error}</p>}
-          {!error && notice && <p className="lobby-notice" role="status">{notice}</p>}
 
           <AllTablesDropdown tables={tables} activeId={activeId} onPick={pickFromList} />
         </div>
@@ -126,7 +143,8 @@ export default function Lobby({ onJoined, onCreate, focusTableId = null, notice 
           onActiveChange={setActiveId}
           onJoin={requestJoin}
           joiningId={joiningId}
-          keyboardEnabled={!passwordFor}
+          keyboardEnabled={!passwordFor && !divingId}
+          divingId={divingId}
         />
 
         {/* Inside the table picker so it can never cover the ads */}

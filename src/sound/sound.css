@@ -1,0 +1,67 @@
+/* Sound button + settings panel */
+
+.sound-control {
+  position: relative;
+}
+
+.sound-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 18px;
+}
+
+.sound-control.is-compact .sound-button {
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+.sound-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 60;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-card);
+  background: linear-gradient(var(--panel-top), var(--panel-bottom));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+
+.sound-mute {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 14px;
+}
+
+.sound-slider {
+  display: grid;
+  grid-template-columns: 64px 1fr 32px;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.sound-slider input {
+  width: 100%;
+  accent-color: var(--mint);
+}
+
+.sound-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--mint-soft);
+}
