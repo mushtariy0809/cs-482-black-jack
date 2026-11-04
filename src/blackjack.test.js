@@ -174,3 +174,22 @@ test('resolvePayout returns correct money based on result and blackjack', () => 
   assert.equal(resolvePayout(100, 10, 'push', hand('10', '10')), 110);
   assert.equal(resolvePayout(100, 10, 'dealer', hand('10', 'A')), 100);
 });
+
+test('evaluates natural blackjack payout correctly', () => {
+  const g ={
+    deck: hand('6'),
+    hands: [{ cards: hand('A', 'K'), bet: 10 }],
+    player: hand('A', 'K'),
+    dealer: hand('9', '8'),
+    phase: 'player',
+    result: null,
+    activeHandIndex: 0,
+    money: 100
+  };
+
+  const scored = scoreHand(g.hands[0].cards);
+  assert.strictEqual(scored.blackjack, true);
+
+  const payoutMoney = resolvePayout(90, 10, 'player', g.hands[0].cards);
+  assert.strictEqual(payoutMoney, 115);
+});
