@@ -14,6 +14,7 @@ import { installUiSounds, preload, setMusic } from './sound/SoundManager.js';
 import ConnectionPill from './realtime/ConnectionPill.jsx';
 import { startTables, leaveTable, setInHand } from './realtime/useTables.js';
 import './styles.css';
+import { usePlayerTimer } from './timer.js';
 
 const ASSETS = '/assets/';
 
@@ -100,6 +101,7 @@ function Card({ card, hidden = false }) {
 
 function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The Green Room', toolbar, onChangeTable}) {
 
+  const timeLeft = usePlayerTimer(game, setGame);
   useEffect(() => {
     if (
       game.phase !== 'finished' ||
@@ -173,8 +175,18 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
       <ScorePill>Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}</ScorePill>
       <div className="cards">{game.dealer.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} hidden={!finished&&i===1} delay={dealDelay('dealer',i)}/>)}</div>
      </div>
-     <div className="table-message" role="status">{game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}</div>
-     <div className="player-hand-container" style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap'}}>
+<div className="table-message" role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' }}>
+      <span>
+        {game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn'}
+        {game.phase=== 'player' && ' \u2013 '}
+      </span>
+      {game.phase === 'player' && (
+       <span style={{ color: timeLeft <= 5 ? '#ef4444' : 'inherit', fontWeight: 'bold' }}>
+        {timeLeft}s
+       </span>
+      )}
+     </div>
+          <div className="player-hand-container" style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap'}}>
         {game.hands && game.hands.length > 0 ? (
        game.hands.map((handObj, handIndex) => {
         const isActive = game.phase === 'player' && game.activeHandIndex === handIndex;
