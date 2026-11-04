@@ -174,9 +174,48 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
       <div className="cards">{game.dealer.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} hidden={!finished&&i===1} delay={dealDelay('dealer',i)}/>)}</div>
      </div>
      <div className="table-message" role="status">{game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}</div>
-     <div className="hand">
-      <div className="cards">{game.player.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} delay={dealDelay('player',i)}/>)}</div>
-      <ScorePill>Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</ScorePill>
+     <div className="player-hand-container" style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap'}}>
+        {game.hands && game.hands.length > 0 ? (
+       game.hands.map((handObj, handIndex) => {
+        const isActive = game.phase === 'player' && game.activeHandIndex === handIndex;
+        const handScore = scoreHand(handObj.cards);
+        return (
+         <div 
+          key={handIndex} 
+          className={`hand ${isActive ? 'active-hand' : ''}`}
+          style={{
+           border: isActive ? '2px solid var(--accent, #f59e0b)' : '2px solid transparent',
+           borderRadius: '12px',
+           padding: '12px',
+           background: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+           transition: 'all 0.2s ease'
+          }}
+         >
+          <div className="cards">
+           {handObj.cards.map((c, i) => (
+            <DealtCard 
+             key={c.id || i} 
+             front={<Card card={c}/>} 
+             back={<Card hidden/>} 
+             delay={dealDelay('player', i)}
+            />
+           ))}
+          </div>
+          <ScorePill>
+           {game.hands.length > 1 ? `Hand ${handIndex + 1} ` : 'Your hand'} 
+           {handObj.bet ? `($${handObj.bet})` : ''} 
+           {handObj.cards.length ? ` · ${handScore.total}${handScore.blackjack ? ' · Blackjack' : handScore.bust ? ' · Bust' : handScore.soft ? ' · Soft' : ''}` : ''}
+           {isActive ? ' ◀ Active' : ''}
+          </ScorePill>
+         </div>
+        );
+       })
+      ) : (
+       <div className="hand">
+        <div className="cards">{game.player.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} delay={dealDelay('player',i)}/>)}</div>
+        <ScorePill>Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</ScorePill>
+       </div>
+      )}
      </div>
 
      {/* Controls bar (practice-controls: these buttons make card/chip sounds instead of a click) */}
