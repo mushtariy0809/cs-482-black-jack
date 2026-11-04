@@ -555,11 +555,9 @@ function HistoryScreen({ player, onBack }) {
   return (
     <div className="layout">
       <section className="panel">
-        <span className="eyebrow">21 CLUB</span>
+
         <h2>Game History</h2>
         <p>Past games for {player.name}</p>
-
-        <button onClick={onBack}>Back to the game</button>
 
         {loading ? (
           <p>Loading your games...</p>
@@ -595,21 +593,635 @@ function HistoryScreen({ player, onBack }) {
   );
 }
 
+function FriendsScreen({ player, onBack }) {
+  const [friends, setFriends] = useState([]);
+  const [friendRequests, setFriendRequests] = useState([]);
+  const [selectedFriend, setSelectedFriend] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const sendFriendRequest = async (receiverId) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/friends/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          senderId: player.id,
+          receiverId: receiverId
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || 'Unable to send friend request.');
+        return;
+      }
+
+      alert('Friend request sent successfully!');
+
+    } catch (error) {
+      console.error('Friend request error:', error);
+      alert('Something went wrong. Please try again.');
+    }
+  };
+
+  const acceptFriendRequest = async (requesterId) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/friends/accept', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          playerId: player.id,
+          requesterId: requesterId
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || 'Unable to accept friend request.');
+        return;
+      }
+
+      alert('Friend request accepted!');
+
+      // Refresh friends and requests
+      const updatedResponse = await fetch(
+        `http://localhost:5000/api/friends/${player.id}`
+      );
+
+      const updatedData = await updatedResponse.json();
+
+      setFriends(updatedData.friends);
+      setFriendRequests(updatedData.friendRequests);
+
+    } catch (error) {
+      console.error('Accept friend request error:', error);
+      alert('Something went wrong. Please try again.');
+    }
+  };
+
+  const declineFriendRequest = async (requesterId) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/friends/decline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          playerId: player.id,
+          requesterId: requesterId
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || 'Unable to decline friend request.');
+        return;
+      }
+
+      alert('Friend request declined.');
+
+      const updatedResponse = await fetch(
+        `http://localhost:5000/api/friends/${player.id}`
+      );
+
+      const updatedData = await updatedResponse.json();
+
+      setFriends(updatedData.friends);
+      setFriendRequests(updatedData.friendRequests);
+
+    } catch (error) {
+      console.error('Decline friend request error:', error);
+      alert('Something went wrong. Please try again.');
+    }
+  };
+
+  const removeFriend = async (friendId) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/friends/remove', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId: player.id,
+          friendId: friendId
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || 'Unable to remove friend.');
+        return;
+      }
+
+      alert('Friend removed successfully!');
+
+      const updatedResponse = await fetch(
+        `http://localhost:5000/api/friends/${player.id}`
+      );
+
+      const updatedData = await updatedResponse.json();
+
+      setFriends(updatedData.friends);
+      setFriendRequests(updatedData.friendRequests);
+    } catch (error) {
+      console.error('Remove friend error:', error);
+      alert('Something went wrong. Please try again.');
+    }
+  };
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch(`http://localhost:5000/api/friends/${player.id}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Could not load friends.');
+        }
+        return response.json();
+      })
+      .then(data => {
+        setFriends(data.friends);
+        setFriendRequests(data.friendRequests);
+      })
+      .catch(() => {
+        setError('Unable to load your friends.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [player.id]);
+  
+  useEffect(() => {
+    const username = searchTerm.trim();
+
+    if (!username) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+
+    fetch(`http://localhost:5000/api/friends/search?username=${encodeURIComponent(username)}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Could not search for players.');
+        }
+        return response.json();
+      })
+      .then(data => {
+        setSearchResults(data);
+      })
+      .catch(error => {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      })
+      .finally(() => {
+        setSearchLoading(false);
+      });
+  }, [searchTerm]);
+
+  if (selectedFriend) {
+    return (
+      <ChatScreen
+        player={player}
+        friend={selectedFriend}
+        onBack={() => setSelectedFriend(null)}
+      />
+    );
+  }
+
+  
+  return (
+    <div className="friends-page">
+      <div className="friends-columns">
+
+        <section className="panel friends-panel">
+          <h2>My Friends</h2>
+          <p>Your friends and connections.</p>
+
+          {loading ? (
+            <p>Loading friends...</p>
+          ) : error ? (
+            <p>{error}</p>
+          ) : (
+            <>
+              <div className="friend-requests-section">
+                <h3>Friend Requests</h3>
+
+                {friendRequests.length === 0 ? (
+                  <p>No pending friend requests.</p>
+                ) : (
+                  friendRequests.map(request => (
+                    <div key={request._id} className="friend-card friend-request-card">
+
+                      <div className="friend-avatar">
+                        {request.username.charAt(0).toUpperCase()}
+                      </div>
+
+                      <div className="friend-details">
+                        <h3>{request.username}</h3>
+                      </div>
+
+                      <div className="friend-actions">
+                        <button
+                          className="friend-chat-button"
+                          onClick={() => acceptFriendRequest(request._id)}
+                        >
+                          Accept
+                        </button>
+
+                        <button
+                          className="friend-remove-button"
+                          onClick={() => declineFriendRequest(request._id)}
+                        >
+                          Decline
+                        </button>
+                      </div>
+
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="friends-list">
+                {friends.length === 0 ? (
+                  <p>You haven't added any friends yet.</p>
+                ) : (
+                  friends.map(friend => (
+                    <div key={friend._id} className="friend-card">
+                      <div className="friend-avatar">
+                        {friend.username.charAt(0).toUpperCase()}
+                      </div>
+
+                      <div className="friend-details">
+                        <h3>{friend.username}</h3>
+                      </div>
+
+                      <div className="friend-actions">
+                        <button
+                          className="friend-chat-button"
+                          onClick={() => setSelectedFriend(friend)}
+                        >
+                          Chat
+                        </button>
+
+                        <button
+                          className="friend-remove-button"
+                          onClick={() => removeFriend(friend._id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </section>
+
+        <section className="panel friends-panel">
+          <span className="eyebrow">DISCOVER PLAYERS</span>
+          <h2>Find a Friend</h2>
+          <p>Search for other registered players.</p>
+
+          <input
+            type="text"
+            placeholder="Search username..."
+            className="friends-search"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+
+          <div className="search-results">
+            <h3>Registered Players</h3>
+
+            {!searchTerm.trim() ? (
+              null
+            ) : searchLoading ? (
+              <p>Searching players...</p>
+            ) : searchResults.filter(
+                result => result._id !== player.id
+              ).length === 0 ? (
+              <p>No players found.</p>
+            ) : (
+              searchResults
+                .filter(result => result._id !== player.id)
+                .map(result => (
+                  <div key={result._id} className="search-result">
+                    <div className="friend-avatar">
+                      {result.username.charAt(0).toUpperCase()}
+                    </div>
+
+                    <div className="friend-details">
+                      <h3>{result.username}</h3>
+                      <span>Registered player</span>
+                    </div>
+
+                    <button
+                      className="add-friend-button"
+                      onClick={() => sendFriendRequest(result._id)}
+                    >
+                      + Add Friend
+                    </button>
+                  </div>
+                ))
+            )}
+          </div>
+        </section>
+
+      </div>
+
+      <div className="friends-back-button">
+        <button className="primary wide" onClick={onBack}>
+          Back to the game
+        </button>
+      </div>
+    </div>
+  );
+
+}
+
+
+function ChatScreen({ player, friend, onBack }) {
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  async function loadMessages() {
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/messages/${player.id}/${friend._id}`
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to load messages.');
+      }
+
+      setMessages(data);
+      setError('');
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMessages();
+
+    const interval = setInterval(loadMessages, 3000);
+    return () => clearInterval(interval);
+  }, [player.id, friend._id]);
+
+  async function sendMessage() {
+    if (!newMessage.trim()) return;
+
+    try {
+      const response = await fetch(
+        'http://localhost:5000/api/messages/send',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            senderId: player.id,
+            receiverId: friend._id,
+            message: newMessage.trim()
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to send message.');
+      }
+
+      setNewMessage('');
+      await loadMessages();
+    } catch (error) {
+      setError(error.message);
+    }
+  }
+
+  return (
+    <div className="instagram-chat">
+
+      <div className="chat-header">
+        <button className="chat-back" onClick={onBack}>
+          ←
+        </button>
+
+        <div className="chat-header-avatar">
+          {friend.username.charAt(0).toUpperCase()}
+        </div>
+
+        <div className="chat-header-info">
+          <h2>{friend.username}</h2>
+          <span>21 CLUB · FRIENDS</span>
+        </div>
+
+        <div className="chat-header-status">
+          <span></span>
+        </div>
+      </div>
+
+      <div className="instagram-chat-messages">
+
+        <div className="chat-welcome">
+          <div className="chat-large-avatar">
+            {friend.username.charAt(0).toUpperCase()}
+          </div>
+
+          <h3>{friend.username}</h3>
+          <p>You're connected on 21 CLUB.</p>
+          <span>Start your conversation below.</span>
+        </div>
+
+        {loading ? (
+          <p className="chat-status">Loading messages...</p>
+        ) : messages.length === 0 ? (
+          <p className="chat-status">No messages yet. Say hello!</p>
+        ) : (
+          messages.map(message => {
+            const isMine =
+              String(message.sender?._id) === String(player.id);
+
+            return (
+              <div
+                key={message._id}
+                className={`chat-message-row ${isMine ? 'mine' : 'theirs'}`}
+              >
+                <div className="chat-message-content">
+
+                  <span className="chat-sender-name">
+                    {isMine ? 'YOU' : friend.username.toUpperCase()}
+                  </span>
+
+                  <div className="chat-bubble">
+                    {message.message}
+                  </div>
+
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        {error && <p className="chat-error">{error}</p>}
+      </div>
+
+      <div className="instagram-chat-input">
+
+        <input
+          type="text"
+          value={newMessage}
+          onChange={e => setNewMessage(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') sendMessage();
+          }}
+          placeholder={`Message ${friend.username}...`}
+        />
+
+        <button
+          className="chat-send-button"
+          onClick={sendMessage}
+          disabled={!newMessage.trim()}
+        >
+          Send
+        </button>
+
+      </div>
+
+    </div>
+  );
+}
+
+function ProfileEditor({ player, onSave, onCancel }) {
+  const [username, setUsername] = useState(player.name);
+  const [profilePicture, setProfilePicture] = useState(
+    player.profilePicture || ''
+  );
+
+  const avatars = [
+    'avatar1.jpg',
+    'avatar2.jpg',
+    'avatar3.jpg',
+    'avatar4.jpg',
+    'avatar5.jpg',
+    'avatar6.jpg'
+  ];
+
+  function handleImageUpload(event) {
+    const file = event.target.files[0];
+
+    if (file) {
+      const reader = new FileReader();
+
+      reader.onloadend = () => {
+        setProfilePicture(reader.result);
+      };
+
+      reader.readAsDataURL(file);
+    }
+  }
+
+  return (
+    <section className="profile-editor">
+      <h2>My Profile</h2>
+
+      <label>
+        Username
+        <input
+          type="text"
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+        />
+      </label>
+
+      <p>Choose a profile picture</p>
+
+      <div className="avatar-options">
+        {avatars.map((avatar) => (
+          <button
+            key={avatar}
+            type="button"
+            onClick={() => setProfilePicture(`${ASSETS}${avatar}`)}
+          >
+            <img src={`${ASSETS}${avatar}`} alt="Avatar option" />
+          </button>
+        ))}
+      </div>
+
+      <label>
+        Or upload a picture from your computer
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+        />
+      </label>
+
+      {profilePicture && (
+        <div className="profile-preview">
+          <p>Preview</p>
+          <img src={profilePicture} alt="Profile preview" />
+        </div>
+      )}
+
+      <div className="profile-editor-actions">
+        <button
+          type="button"
+          onClick={() => onSave({ name: username, profilePicture })}
+        >
+          Save Changes
+        </button>
+
+        <button type="button" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
  const [screen,setScreen]=useState('start');
  const [game,setGame]=useState(null);
  const [player,setPlayer]=useState(null);
+ const [profileMenuOpen, setProfileMenuOpen] = useState(false);
  const [authMode, setAuthMode] = useState('login');
  const [bet, setBet] = useState(10);
  const historySaved = useRef(new Set());
  const main=useRef(null);
  useEffect(()=>{main.current?.focus();},[screen]);
-//  function begin(){setGame(startGame());setScreen('game');}
-function begin(){
-  setAuthMode('login');
-  setScreen('auth');
-}
 
+function begin(){
+  if (player && player.type === 'registered') {
+    
+    setGame(startGame());
+    setScreen('game');
+
+  } else {
+    
+    setAuthMode('login');
+    setScreen('auth');
+  }
+}
 
 return (
   <>
@@ -648,6 +1260,80 @@ return (
           </button>
       )}
 
+      {player?.type === 'registered' && (
+  <div className="profile-menu-container">
+    <button
+      className="profile-button"
+      onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+      aria-label="Open profile menu"
+      aria-expanded={profileMenuOpen}
+      title="My Profile"
+    >
+      {player.profilePicture ? (
+        <img
+          src={player.profilePicture}
+          alt="Profile"
+          className="header-profile-picture"
+        />
+      ) : (
+        <span className="profile-placeholder">
+          {player.name.charAt(0).toUpperCase()}
+        </span>
+      )}
+    </button>
+
+    {profileMenuOpen && (
+      <div className="profile-dropdown">
+
+        <div className="profile-dropdown-info">
+          {player.profilePicture ? (
+            <img
+              src={player.profilePicture}
+              alt="Profile"
+              className="dropdown-profile-picture"
+            />
+          ) : (
+            <div className="dropdown-profile-placeholder">
+              {player.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+
+          <h3>{player.name}</h3>
+          <p>{player.email}</p>
+        </div>
+
+        <div className="profile-dropdown-divider"></div>
+
+        <button onClick={() => {
+          setProfileMenuOpen(false);
+          setScreen('profile');
+        }}>
+          <span>👤</span>
+          My Profile
+        </button>
+
+        <button onClick={() => {
+          setProfileMenuOpen(false);
+          setScreen('friends');
+        }}>
+          <span>👥</span>
+          View Friends
+        </button>
+
+        <button onClick={() => {
+          setProfileMenuOpen(false);
+          setPlayer(null);
+          setGame(null);
+          setScreen('start');
+        }}>
+          <span>🚪</span>
+          Log Out
+        </button>
+      </div>
+    )}
+  </div>
+)}
+
       </nav>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginleft: 'auto'}}>
         {screen == 'game' && (
@@ -664,7 +1350,7 @@ return (
               borderRadius: '9999px',
               cursor: 'pointer',
               fontWeight: 'bold',
-              lineheight  : '1.5'
+              lineHeight  : '1.5'
             }}
           >
             Exit Game
@@ -705,6 +1391,25 @@ return (
           player={player}
           onBack={() => setScreen(game ? 'game' : 'start')}
         />  
+      ) : screen === 'friends' && player?.type === 'registered' ? (
+        <FriendsScreen
+          player={player}
+          onBack={() => setScreen(game ? 'game' : 'start')}
+        />
+
+      ) : screen === 'profile' && player?.type === 'registered' ? (
+        <ProfileEditor
+          player={player}
+          onSave={(updatedProfile) => {
+            setPlayer({
+              ...player,
+              name: updatedProfile.name,
+              profilePicture: updatedProfile.profilePicture
+            });
+            setScreen(game ? 'game' : 'start');
+          }}
+          onCancel={() => setScreen(game ? 'game' : 'start')}
+        />
       ) : (
         <>
           <h1>A good hand. Better company.</h1>
