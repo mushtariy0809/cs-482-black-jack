@@ -7,7 +7,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "dev:memory": "node dev-memory.js",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --experimental-test-coverage --test \"test/*.test.js\" \"controllers/*.test.js\""
   },
   "keywords": [],
   "author": "",

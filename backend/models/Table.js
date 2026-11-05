@@ -98,4 +98,25 @@ const tableSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Find a table using its invite code
+tableSchema.statics.findByInviteCode = function(inviteCode) {
+  return this.findOne({ inviteCode: inviteCode });
+};
+
+// Find public tables that are waiting for players
+tableSchema.statics.findAvailableTables = function() {
+  return this.find({
+    visibility: 'public',
+    status: 'waiting',
+    solo: false
+  });
+};
+
+// Find a table containing a specific player
+tableSchema.statics.findByPlayer = function(clientId) {
+  return this.findOne({
+    'seats.clientId': clientId
+  });
+};
+
 module.exports = mongoose.model('Table', tableSchema);
