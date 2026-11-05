@@ -15,6 +15,8 @@ import ConnectionPill from './realtime/ConnectionPill.jsx';
 import { startTables, leaveTable, setInHand } from './realtime/useTables.js';
 import './styles.css';
 import { usePlayerTimer } from './timer.js';
+import { createMultiplayerTable, getNextClockwiseSeat } from './tableManager.js';
+import { useMultiplayerTimer } from './multiPlayerTimer.js';
 
 const ASSETS = '/assets/';
 
@@ -99,9 +101,8 @@ function Card({ card, hidden = false }) {
   );
 }
 
-function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The Green Room', toolbar, onChangeTable}) {
+function Game({game,setGame,player,historySaved, bet, setBet, tableState, timeLeft, tableName = 'The Green Room', toolbar, onChangeTable}) {
 
-  const timeLeft = usePlayerTimer(game, setGame);
   useEffect(() => {
     if (
       game.phase !== 'finished' ||
@@ -151,6 +152,32 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
       });
   }, [game, player]);
 
+const handlePlayerHit = () => {
+    // 1. Get the immediate result of hitting
+    const nextGame = hit(game);
+    const activeCards = nextGame.hands?.[nextGame.activeHandIndex]?.cards || nextGame.player;
+    const isBust = scoreHand(activeCards).bust;
+    const isOver21 = scoreHand(activeCards).total >= 21;
+
+    if (isBust || isOver21) {
+      // 2. If you bust or hit 21, temporarily freeze the game in 'player' phase 
+      // with the new card rendered, so the dealer doesn't immediately draw.
+      setGame({
+        ...nextGame,
+        phase: 'player', 
+        dealer: game.dealer // Keep dealer hidden/stopped until you see your card
+      });
+
+      // 3. Give the player card animation time to finish (e.g., 400ms), 
+      // then let the dealer/finish state take over.
+      setTimeout(() => {
+        setGame(nextGame);
+      }, 900);
+    } else {
+      setGame(nextGame);
+    }
+  }
+
  const p=scoreHand(game.player), d=scoreHand(game.dealer);
  const finished=game.phase==='finished';
  const messages={player:'You win.',dealer:'Dealer wins.',push:'Push. It’s a tie.'};
@@ -175,60 +202,156 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
       <ScorePill>Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}</ScorePill>
       <div className="cards">{game.dealer.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} hidden={!finished&&i===1} delay={dealDelay('dealer',i)}/>)}</div>
      </div>
+{/* TABLE MESSAGE BAR */}
 <div className="table-message" role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' }}>
-      <span>
-        {game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn'}
-        {game.phase=== 'player' && ' \u2013 '}
-      </span>
-      {game.phase === 'player' && (
-       <span style={{ color: timeLeft <= 5 ? '#ef4444' : 'inherit', fontWeight: 'bold' }}>
-        {timeLeft}s
-       </span>
-      )}
-     </div>
-          <div className="player-hand-container" style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap'}}>
-        {game.hands && game.hands.length > 0 ? (
-       game.hands.map((handObj, handIndex) => {
-        const isActive = game.phase === 'player' && game.activeHandIndex === handIndex;
-        const handScore = scoreHand(handObj.cards);
-        return (
-         <div 
-          key={handIndex} 
-          className={`hand ${isActive ? 'active-hand' : ''}`}
-          style={{
-           border: isActive ? '2px solid var(--accent, #f59e0b)' : '2px solid transparent',
-           borderRadius: '12px',
-           padding: '12px',
-           background: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
-           transition: 'all 0.2s ease'
+  <span>
+    {game.phase === 'ready' ? 'Your table is ready.' : finished ? messages[game.result] : 'Your turn'}
+    {game.phase === 'player' && ' \u2013 '}
+  </span>
+  {game.phase === 'player' && (
+    <span style={{ color: timeLeft <= 5 ? '#ef4444' : 'inherit', fontWeight: 'bold' }}>
+      {timeLeft}s
+    </span>
+  )}
+</div>
+
+{/* 7-PLAYER SEAT GRID */}
+<div 
+  className="multiplayer-table-stage" 
+  style={{ 
+    position: 'absolute', 
+    bottom: '140px', // 👈 Raised higher to clear bottom buttons
+    left: '50%', 
+    transform: 'translateX(-50%)', 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'flex-end',
+    gap: '16px', 
+    width: '95%', 
+    maxWidth: '920px',
+    pointerEvents: 'none', 
+    zIndex: 5 
+  }}
+>
+  {tableState?.seats?.map((playerSeat, seatIndex) => {
+    const isCurrentTurn = tableState.phase === 'playing' && tableState.activeSeatIndex === seatIndex;
+    
+    // U-Shape Arc Curve Offsets (Middle seats drop down, edge seats curve up)
+    const arcYOffsets = [-50, -25, 0, 15, 0, -25, -50];
+    const yOffset = arcYOffsets[seatIndex] || 0;
+
+    // Check if player has hands (supports split hands: hand 1 & hand 2)
+    const hands = playerSeat?.hands || (playerSeat?.hand ? [playerSeat.hand] : []);
+
+    return (
+      <div 
+        key={seatIndex} 
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          flex: '1',
+          maxWidth: '120px',
+          transform: `translateY(${yOffset}px)`,
+          pointerEvents: 'auto'
+        }}
+      >
+        {/* 🎴 CLEAN SIDE-BY-SIDE CARDS (SUPPORTS SPLITS: HAND 1 TOP, HAND 2 BOTTOM) */}
+  {playerSeat && (
+  <div 
+    style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: '4px', 
+      marginBottom: '6px', 
+      alignItems: 'center',
+      //transform: 'translateY(-10px)'
+    }}
+  >
+    {(playerSeat.hands && playerSeat.hands.length > 0 
+      ? playerSeat.hands.map(h => h.cards || h) 
+      : [playerSeat.hand || []]
+    ).map((handCards, handIdx) => {
+      const isActiveHand = playerSeat.hands?.length > 1 && playerSeat.activeHandIndex === handIdx;
+      return (
+        <div 
+          key={handIdx}
+          style={{ 
+            display: 'inline-flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            background: 'transparent',
+            padding: '2px 4px',
+            borderRadius: '6px',
+            border: isActiveHand ? '1px solid #f9e1b2' : '1px solid transparent',
+            boxShadow: isActiveHand ? '0 0 6px rgba(249, 225, 178, 0.3)' : 'none'
           }}
-         >
-          <div className="cards">
-           {handObj.cards.map((c, i) => (
-            <DealtCard 
-             key={c.id || i} 
-             front={<Card card={c}/>} 
-             back={<Card hidden/>} 
-             delay={dealDelay('player', i)}
-            />
-           ))}
+        >
+          {handCards.map((c, i) => (
+            <div 
+              key={c.id || i} 
+              style={{ 
+                transform: 'scale(0.420)', 
+                transformOrigin: 'bottom center',
+                marginLeft: i === 0 ? '0' : '-64px', 
+                zIndex: i,
+                transition: 'transform 0.15s ease-out'
+              }}
+            >
+              <DealtCard 
+                front={<Card card={c} />} 
+                delay={dealDelay('player', i)} 
+              />
+            </div>
+          ))}
+        </div>
+      );
+    })}
+  </div>
+)}
+
+        {/* 🪑 THE SEAT INFO BOX */}
+        <div 
+          className={`seat-box ${isCurrentTurn ? 'active-seat' : ''}`}
+          style={{
+            width: '100%',
+            border: isCurrentTurn ? '2px solid var(--accent, #f59e0b)' : '1px solid rgba(255, 255, 255, 0.18)',
+            borderRadius: '10px',
+            padding: '6px 8px',
+            background: isCurrentTurn ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(6px)',
+            boxShadow: isCurrentTurn ? '0 0 12px rgba(245, 158, 11, 0.4)' : '0 4px 10px rgba(0,0,0,0.3)',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          <div className="seat-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px', fontSize: '0.65rem' }}>
+            <strong style={{ color: '#d1d5db' }}>Seat {seatIndex + 1}</strong>
+            {isCurrentTurn && (
+              <span style={{ color: timeLeft <= 5 ? '#ef4444' : '#f59e0b', fontWeight: 'bold' }}>
+                ⏱️{timeLeft}s
+              </span>
+            )}
           </div>
-          <ScorePill>
-           {game.hands.length > 1 ? `Hand ${handIndex + 1} ` : 'Your hand'} 
-           {handObj.bet ? `($${handObj.bet})` : ''} 
-           {handObj.cards.length ? ` · ${handScore.total}${handScore.blackjack ? ' · Blackjack' : handScore.bust ? ' · Bust' : handScore.soft ? ' · Soft' : ''}` : ''}
-           {isActive ? ' ◀ Active' : ''}
-          </ScorePill>
-         </div>
-        );
-       })
-      ) : (
-       <div className="hand">
-        <div className="cards">{game.player.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} delay={dealDelay('player',i)}/>)}</div>
-        <ScorePill>Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</ScorePill>
-       </div>
-      )}
-     </div>
+
+          {playerSeat ? (
+            <div className="seat-content">
+              <div className="player-name" style={{ fontSize: '0.7rem', fontWeight: '600', opacity: 0.95, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {playerSeat.name}
+              </div>
+              <div className="player-chips" style={{ fontSize: '0.65rem', color: '#10b981' }}>
+                ${playerSeat.chips}
+              </div>
+            </div>
+          ) : (
+            <div className="empty-seat" style={{ fontStyle: 'italic', opacity: '0.35', fontSize: '0.65rem', textAlign: 'center', padding: '2px 0' }}>
+              Empty
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  })}
+</div>
 
      {/* Controls bar (practice-controls: these buttons make card/chip sounds instead of a click) */}
      <div className="game-controls practice-controls">
@@ -255,7 +378,15 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
         </div>
         <button
          className="primary controls-main"
-         onClick={()=>setGame(dealRound(game, bet))}
+         onClick={() => {
+          setGame(dealRound(game, bet));
+          setTableState(prev => ({ 
+            ...prev, 
+            phase: 'playing', 
+            activeSeatIndex: 0,
+            timerReset: Date.now() // 👈 Forces the timer hook to reset its countdown
+          }));
+        }}
          disabled={bet > game.money || game.money <=0}
         >
          Deal ({bet})
@@ -263,7 +394,17 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
        </>
       ) : finished ? (
        <div className="result-actions">
-        <button className="primary wide" onClick={()=>setGame(startGame(game.money))}>
+        <button className="primary wide" 
+        onClick={() => {
+        setGame(startGame(game.money));
+        setTableState(prev => ({ 
+          ...prev, 
+          phase: 'playing', 
+          activeSeatIndex: 0,
+          timerReset: Date.now()
+        }));
+      }}
+        >
          Start a fresh game
         </button>
         {onChangeTable && (
@@ -290,8 +431,8 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
         >
          Split
         </button>
-        <button className="primary controls-main" onClick={()=>setGame(hit(game))} disabled={p.bust || p.total >=21}>
-         Hit
+        <button className="primary controls-main" onClick={handlePlayerHit} disabled={p.bust || p.total >=21}>
+        Hit
         </button>
         <button className="primary controls-main" onClick={()=>setGame(stand(game))} disabled={p.bust}>
          Stand
@@ -1126,10 +1267,66 @@ export default function App() {
  // Table the player is seated at, and chips carried between tables
  const [table, setTable] = useState(null);
  const [chips, setChips] = useState(1000);
+
+ const [tableState, setTableState] = useState(() => createMultiplayerTable('table-1'));
+
+ const timeLeft = usePlayerTimer(game, setGame);
+ 
+ const gameRef = useRef(game);
+ useEffect(() => {
+   gameRef.current = game;
+ }, [game]);
+
+ const handleJoinTable = (playerName = player?.name || 'You', startingChips = chips) => {
+  setTableState(prev => {
+    if (!prev || !prev.seats) return prev;
+
+    const nextSeats = [...prev.seats];
+    const emptyIndex = nextSeats.findIndex(s => s === null);
+
+    if (emptyIndex === -1){
+      alert('Table is full!');
+      return prev;
+    }
+
+    nextSeats[emptyIndex] = {
+      name: playerName,
+      chips: startingChips,
+      hand: [],
+      phase: 'playing'
+    };
+
+    return{
+      ...prev,
+      seats: nextSeats,
+      phase: prev.phase === 'waiting' ? 'playing' : prev.phase
+    };
+  });
+ };
+
  useEffect(()=>{main.current?.focus();},[screen]);
  useEffect(() => {
   if (game) setChips(game.money);
  }, [game?.money]);
+
+ useEffect(() => {
+    if (!game || !tableState) return;
+    
+    setTableState(prev => {
+      if (!prev || !prev.seats) return prev;
+      const newSeats = [...prev.seats];
+      if (newSeats[0]) {
+        newSeats[0] = {
+          ...newSeats[0],
+          chips: game.money ?? newSeats[0].chips,
+          hand: game.player || [],
+          hands: game.hands || null, 
+          activeHandIndex: game.activeHandIndex ?? 0 
+        };
+      }
+      return { ...prev, seats: newSeats };
+    });
+  }, [game?.player, game?.hands, game?.activeHandIndex]);
 
  // Tell the lobby when a hand is in progress (shows the table as "In game")
  const inHand = screen === 'game' && Boolean(game) && game.phase !== 'ready' && game.phase !== 'finished';
@@ -1179,6 +1376,22 @@ function enterLobby(newPlayer) {
 function sitAt(joinedTable) {
   setTable(joinedTable);
   setGame(startGame(chips));
+
+  setTableState(prev => {
+   const newSeats = Array(7).fill(null);
+   if (joinedTable?.players && Array.isArray(joinedTable.players)) {
+     joinedTable.players.forEach((p, idx) => {
+       if (idx < 7) {
+         newSeats[idx] = { name: p.name, chips: p.chips || 1000, hand: [], phase: 'playing' };
+       }
+     });
+   } else {
+     // Fallback: put current player in seat 0
+     newSeats[0] = { name: player?.name || 'Guest', chips, hand: [], phase: 'playing' };
+   }
+   return { ...prev, seats: newSeats, phase: 'playing' };
+ });
+
   setScreen('game');
 }
 
@@ -1371,6 +1584,8 @@ return (
       ) : screen === 'game' && game ? (
         <Game
           game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet}
+          tableState={tableState}
+          timeLeft={timeLeft}
           tableName={table?.name}
           toolbar={table && <TableBar table={table} onLeave={requestLeave} />}
           onChangeTable={table ? exitTable : undefined}
