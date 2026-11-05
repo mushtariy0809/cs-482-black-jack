@@ -9,11 +9,13 @@ import LeaveConfirm from './table/LeaveConfirm.jsx';
 import TableFx, { DealtCard, ScorePill, dealDelay } from './table/TableFx.jsx';
 import PracticeRound from './tutorial/PracticeRound.jsx';
 import TableAds from './table/TableAds.jsx';
+import MultiplayerGame from './table/MultiplayerGame.jsx';
 import SoundButton from './sound/SoundButton.jsx';
 import { installUiSounds, preload, setMusic } from './sound/SoundManager.js';
 import ConnectionPill from './realtime/ConnectionPill.jsx';
-import { startTables, leaveTable, setInHand } from './realtime/useTables.js';
+import { startTables, leaveTable, setInHand, useTables, joinTable, setChipsHint } from './realtime/useTables.js';
 import './styles.css';
+import { usePlayerTimer } from './timer.js';
 
 const ASSETS = '/assets/';
 
@@ -98,7 +100,7 @@ function Card({ card, hidden = false }) {
   );
 }
 
-function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The Green Room', toolbar, onChangeTable}) {
+function Game({game,setGame,player,historySaved, bet, setBet, timeLeft, tableName = 'The Green Room', toolbar, onChangeTable}) {
 
   useEffect(() => {
     if (
@@ -149,6 +151,32 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
       });
   }, [game, player]);
 
+const handlePlayerHit = () => {
+    // 1. Get the immediate result of hitting
+    const nextGame = hit(game);
+    const activeCards = nextGame.hands?.[nextGame.activeHandIndex]?.cards || nextGame.player;
+    const isBust = scoreHand(activeCards).bust;
+    const isOver21 = scoreHand(activeCards).total >= 21;
+
+    if (isBust || isOver21) {
+      // 2. If you bust or hit 21, temporarily freeze the game in 'player' phase 
+      // with the new card rendered, so the dealer doesn't immediately draw.
+      setGame({
+        ...nextGame,
+        phase: 'player', 
+        dealer: game.dealer // Keep dealer hidden/stopped until you see your card
+      });
+
+      // 3. Give the player card animation time to finish (e.g., 400ms), 
+      // then let the dealer/finish state take over.
+      setTimeout(() => {
+        setGame(nextGame);
+      }, 900);
+    } else {
+      setGame(nextGame);
+    }
+  }
+
  const p=scoreHand(game.player), d=scoreHand(game.dealer);
  const finished=game.phase==='finished';
  const messages={player:'You win.',dealer:'Dealer wins.',push:'Push. It’s a tie.'};
@@ -173,10 +201,61 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
       <ScorePill>Dealer{game.dealer.length ? ` · ${finished?d.total:scoreHand(game.dealer.slice(0,1)).total+' + ?'}`:''}</ScorePill>
       <div className="cards">{game.dealer.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} hidden={!finished&&i===1} delay={dealDelay('dealer',i)}/>)}</div>
      </div>
-     <div className="table-message" role="status">{game.phase==='ready'?'Your table is ready.':finished?messages[game.result]:'Your turn.'}</div>
-     <div className="hand">
-      <div className="cards">{game.player.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} delay={dealDelay('player',i)}/>)}</div>
-      <ScorePill>Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</ScorePill>
+{/* TABLE MESSAGE BAR */}
+<div className="table-message" role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' }}>
+  <span>
+    {game.phase === 'ready' ? 'Your table is ready.' : finished ? messages[game.result] : 'Your turn'}
+    {game.phase === 'player' && ' \u2013 '}
+  </span>
+  {game.phase === 'player' && (
+    <span style={{ color: timeLeft <= 5 ? '#ef4444' : 'inherit', fontWeight: 'bold' }}>
+      {timeLeft}s
+    </span>
+  )}
+</div>
+
+<div className="player-hand-container" style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap'}}>
+        {game.hands && game.hands.length > 0 ? (
+       game.hands.map((handObj, handIndex) => {
+        const isActive = game.phase === 'player' && game.activeHandIndex === handIndex;
+        const handScore = scoreHand(handObj.cards);
+        return (
+         <div 
+          key={handIndex} 
+          className={`hand ${isActive ? 'active-hand' : ''}`}
+          style={{
+           border: isActive ? '2px solid var(--accent, #f59e0b)' : '2px solid transparent',
+           borderRadius: '12px',
+           padding: '12px',
+           background: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+           transition: 'all 0.2s ease'
+          }}
+         >
+          <div className="cards">
+           {handObj.cards.map((c, i) => (
+            <DealtCard 
+             key={c.id || i} 
+             front={<Card card={c}/>} 
+             back={<Card hidden/>} 
+             delay={dealDelay('player', i)}
+            />
+           ))}
+          </div>
+          <ScorePill>
+           {game.hands.length > 1 ? `Hand ${handIndex + 1} ` : 'Your hand'} 
+           {handObj.bet ? `($${handObj.bet})` : ''} 
+           {handObj.cards.length ? ` · ${handScore.total}${handScore.blackjack ? ' · Blackjack' : handScore.bust ? ' · Bust' : handScore.soft ? ' · Soft' : ''}` : ''}
+           {isActive ? ' ◀ Active' : ''}
+          </ScorePill>
+         </div>
+        );
+       })
+      ) : (
+       <div className="hand">
+        <div className="cards">{game.player.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} delay={dealDelay('player',i)}/>)}</div>
+        <ScorePill>Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</ScorePill>
+       </div>
+      )}
      </div>
 
      {/* Controls bar (practice-controls: these buttons make card/chip sounds instead of a click) */}
@@ -204,7 +283,9 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
         </div>
         <button
          className="primary controls-main"
-         onClick={()=>setGame(dealRound(game, bet))}
+         onClick={() => {
+          setGame(dealRound(game, bet));
+        }}
          disabled={bet > game.money || game.money <=0}
         >
          Deal ({bet})
@@ -212,7 +293,11 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
        </>
       ) : finished ? (
        <div className="result-actions">
-        <button className="primary wide" onClick={()=>setGame(startGame(game.money))}>
+        <button className="primary wide" 
+        onClick={() => {
+        setGame(startGame(game.money));
+      }}
+        >
          Start a fresh game
         </button>
         {onChangeTable && (
@@ -239,8 +324,8 @@ function Game({game,setGame,player,historySaved, bet, setBet, tableName = 'The G
         >
          Split
         </button>
-        <button className="primary controls-main" onClick={()=>setGame(hit(game))} disabled={p.bust || p.total >=21}>
-         Hit
+        <button className="primary controls-main" onClick={handlePlayerHit} disabled={p.bust || p.total >=21}>
+        Hit
         </button>
         <button className="primary controls-main" onClick={()=>setGame(stand(game))} disabled={p.bust}>
          Stand
@@ -1075,16 +1160,67 @@ export default function App() {
  // Table the player is seated at, and chips carried between tables
  const [table, setTable] = useState(null);
  const [chips, setChips] = useState(1000);
+
+ const { tables, mySeat, tableState: liveTable, offline } = useTables();
+
+ // Multiplayer tables are run by the server (one shared deck, dealer and turn order).
+ // Solo Practice, and demo mode while the server is down, play the local game below.
+ const live = table ? tables.find(t => t.id === table.id) ?? table : null;
+ const shared = Boolean(table) && !table.solo && !offline;
+ const sharedState = shared && liveTable?.tableId === table.id ? liveTable : null;
+ const mySharedSeat = sharedState?.seats.find(s => s.index === mySeat?.seat) ?? null;
+
+ const timeLeft = usePlayerTimer(game, setGame);
+
  useEffect(()=>{main.current?.focus();},[screen]);
  useEffect(() => {
   if (game) setChips(game.money);
  }, [game?.money]);
 
- // Tell the lobby when a hand is in progress (shows the table as "In game")
- const inHand = screen === 'game' && Boolean(game) && game.phase !== 'ready' && game.phase !== 'finished';
+ // At a shared table the server holds the balance; take it whenever it changes
  useEffect(() => {
-  if (table) setInHand(inHand);
- }, [inHand, table]);
+  if (mySharedSeat) setChips(mySharedSeat.chips);
+ }, [mySharedSeat?.chips]);
+
+ // The balance to sit down with at the next table
+ useEffect(() => {
+  setChipsHint(chips);
+ }, [chips]);
+
+ // Tell the lobby when a hand is in progress (shows the table as "In game").
+ // Shared tables: the server already knows.
+ const inHand = shared
+  ? Boolean(mySharedSeat?.hands.length) && ['playing', 'dealer'].includes(sharedState?.phase)
+  : screen === 'game' && Boolean(game) && game.phase !== 'ready' && game.phase !== 'finished';
+ useEffect(() => {
+  if (table && !shared) setInHand(inHand);
+ }, [inHand, table, shared]);
+
+ // Save each settled shared hand to history (same endpoint as the solo game)
+ function saveSharedRound({ key, hands, dealer }) {
+  if (player?.type !== 'registered' || !player?.id || historySaved.current.has(key)) return;
+  historySaved.current.add(key);
+  const hand = hands[0];
+  const result = hand.result === 'player' ? 'win' : hand.result === 'dealer' ? 'loss' : 'push';
+
+  fetch('http://localhost:5000/api/history', {
+   method: 'POST',
+   headers: { 'Content-Type': 'application/json' },
+   body: JSON.stringify({
+    playerId: player.id,
+    result,
+    playerScore: scoreHand(hand.cards).total,
+    dealerScore: scoreHand(dealer).total
+   })
+  })
+   .then(response => {
+    if (!response.ok) throw new Error('Could not save game history.');
+   })
+   .catch(error => {
+    historySaved.current.delete(key);
+    console.error('History error:', error);
+   });
+ }
 
  const [confirmLeave, setConfirmLeave] = useState(false);
  // Table to join as soon as the lobby opens (tutorial's "Practice with bots")
@@ -1116,7 +1252,7 @@ function begin(){
 
 // Where "Play" and the logo lead
 function home() {
-  setScreen(game ? 'game' : player ? 'lobby' : 'start');
+  setScreen(game || table ? 'game' : player ? 'lobby' : 'start');
 }
 
 function enterLobby(newPlayer) {
@@ -1125,9 +1261,21 @@ function enterLobby(newPlayer) {
   setScreen('lobby');
 }
 
-function sitAt(joinedTable) {
+async function sitAt(joinedTable) {
   setTable(joinedTable);
-  setGame(startGame(chips));
+  
+  // 1. Join table via socket server
+  const result = await joinTable({ tableId: joinedTable.id });
+  
+  if (!result.ok) {
+    alert(result.message || 'Could not join table');
+    setScreen('lobby');
+    return;
+  }
+
+  // 2. Solo/demo tables play a local game; shared tables wait for the server's table:state
+  setGame(joinedTable.solo || offline ? startGame(chips) : null);
+
   setScreen('game');
 }
 
@@ -1158,7 +1306,9 @@ function requestLeave() {
   else exitTable();
 }
 
-const stake = game?.hands?.reduce((sum, hand) => sum + hand.bet, 0) || game?.bet || 0;
+const stake = shared
+  ? mySharedSeat?.hands.reduce((sum, hand) => sum + hand.bet, 0) ?? 0
+  : game?.hands?.reduce((sum, hand) => sum + hand.bet, 0) || game?.bet || 0;
 
 // The game screen zooms its table itself (see Game) so its ad column never moves
 const screenMotion = { initial: false, animate: { opacity: 1 }, exit: { opacity: 1, transition: { duration: 0 } } };
@@ -1317,9 +1467,27 @@ return (
         />
       ) : screen === 'create' && player ? (
         <CreateTable onCreated={result => sitAt(result.table)} onCancel={() => setScreen('lobby')} />
+      ) : screen === 'game' && shared ? (
+        sharedState ? (
+          <MultiplayerGame
+            tableState={sharedState}
+            mySeatIndex={mySeat?.seat}
+            maxSeats={live?.maxSeats ?? 5}
+            Card={Card}
+            toolbar={<TableBar table={table} onLeave={requestLeave} />}
+            onChangeTable={requestLeave}
+            onRoundSettled={saveSharedRound}
+          />
+        ) : (
+          <>
+            <TableBar table={table} onLeave={requestLeave} />
+            <p className="table-loading" role="status">Taking your seat…</p>
+          </>
+        )
       ) : screen === 'game' && game ? (
         <Game
           game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet}
+          timeLeft={timeLeft}
           tableName={table?.name}
           toolbar={table && <TableBar table={table} onLeave={requestLeave} />}
           onChangeTable={table ? exitTable : undefined}

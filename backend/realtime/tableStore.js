@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const EventEmitter = require('events');
 const bcrypt = require('bcryptjs');
+const round = require('./round');
 
 // 5 player seats + the bot dealer = the six-person table from the README.
 // The dealer is always a bot: players can never deal.
@@ -10,6 +11,17 @@ const MAX_SEATS = 5;
 const SEAT_HOLD_MS = 10 * 1000;
 // Empty player-made tables are removed after this long
 const IDLE_TABLE_MS = 5 * 60 * 1000;
+// Chips a player sits down with when their browser doesn't say
+const STARTING_CHIPS = 1000;
+const MAX_CHIPS = 10_000_000;
+
+// Shared-round timing (each can be overridden for tests)
+const ROUND_TIMING = {
+  betMs: 15 * 1000,     // after the first bet, how long the others have to bet
+  turnMs: 30 * 1000,    // per action; a player who runs out of time stands
+  dealerMs: 900,        // pause so the last card lands before the dealer reveals
+  settleMs: 6 * 1000    // results stay up this long before the next hand
+};
 
 // Always-available tables. They are created on startup and never removed.
 const SYSTEM_TABLES = [
@@ -71,12 +83,14 @@ function publicView(table) {
 
 class TableStore extends EventEmitter {
   // persist: { save(table), remove(id) }, both may return promises
-  constructor({ persist = {}, now = Date.now } = {}) {
+  constructor({ persist = {}, now = Date.now, timing = {} } = {}) {
     super();
     this.tables = new Map();
     this.holdTimers = new Map();
+    this.roundTimers = new Map();
     this.persist = persist;
     this.now = now;
+    this.timing = { ...ROUND_TIMING, ...timing };
   }
 
   // Load saved tables. Nobody is connected after a restart, so seats start empty.
@@ -87,7 +101,8 @@ class TableStore extends EventEmitter {
         id: String(doc._id ?? doc.id),
         seats: [],
         createdAt: new Date(doc.createdAt ?? this.now()),
-        emptySince: doc.isSystem ? null : new Date(this.now())
+        emptySince: doc.isSystem ? null : new Date(this.now()),
+        round: doc.solo ? null : round.newRound()
       };
       delete table._id;
       delete table.__v;
@@ -113,6 +128,12 @@ class TableStore extends EventEmitter {
   get(tableId) {
     const table = this.tables.get(tableId);
     return table ? publicView(table) : null;
+  }
+
+  // The shared round as players at the table see it (null for solo tables)
+  roundState(tableId) {
+    const table = this.tables.get(tableId);
+    return table?.round ? round.roundView(table, this.now()) : null;
   }
 
   // A client holds at most one seat across all tables
@@ -166,14 +187,14 @@ class TableStore extends EventEmitter {
     this.tables.set(table.id, table);
 
     // The creator always sits as a player
-    const seat = this._takeSeat(table, client).index;
+    const seat = this._takeSeat(table, client, input.chips).index;
 
     this._changed(table, 'created');
 
     return { table: publicView(table), inviteCode: table.inviteCode, seat };
   }
 
-  async join({ tableId, inviteCode, password } = {}, client) {
+  async join({ tableId, inviteCode, password, chips } = {}, client) {
     const table = tableId
       ? this.tables.get(tableId)
       : [...this.tables.values()].find(t => t.inviteCode === String(inviteCode ?? '').trim().toUpperCase());
@@ -199,6 +220,7 @@ class TableStore extends EventEmitter {
         current.seat.reservedUntil = null;
         current.seat.name = client.name;
         this._changed(table);
+        this._roundChanged(table);
       }
       return { table: publicView(table), seat: current.seat.index, rejoined };
     }
@@ -213,8 +235,9 @@ class TableStore extends EventEmitter {
     // Joining a different table gives up any held seat right away
     this._releaseEverywhere(client.clientId);
 
-    const seat = this._takeSeat(table, client);
+    const seat = this._takeSeat(table, client, chips);
     this._changed(table);
+    this._roundChanged(table);
 
     return { table: publicView(table), seat: seat.index, rejoined: false };
   }
@@ -228,7 +251,10 @@ class TableStore extends EventEmitter {
     const { table, seat } = current;
     const forfeited = seat.inHand;
 
+    // Shared round: their hands are lost and play moves on without them
+    if (table.round) round.forfeit(table, seat);
     seat.inHand = false;
+    seat.bet = 0;
     seat.reservedUntil = new Date(this.now() + SEAT_HOLD_MS);
 
     const timer = setTimeout(() => this.releaseSeat(table.id, clientId), SEAT_HOLD_MS);
@@ -236,6 +262,7 @@ class TableStore extends EventEmitter {
     this.holdTimers.set(`${table.id}:${clientId}`, timer);
 
     this._changed(table);
+    this._roundChanged(table);
 
     const reservation = this._reservation(table, seat, forfeited);
     this.emit('seatReserved', { clientId, ...reservation });
@@ -248,18 +275,23 @@ class TableStore extends EventEmitter {
     const table = this.tables.get(tableId);
     if (!table) return;
 
-    const before = table.seats.length;
-    table.seats = table.seats.filter(s => s.clientId !== clientId);
-    if (table.seats.length === before) return;
+    const leaving = table.seats.find(s => s.clientId === clientId);
+    if (!leaving) return;
+
+    if (table.round) round.forfeit(table, leaving);
+    table.seats = table.seats.filter(s => s !== leaving);
 
     this._changed(table);
+    this._roundChanged(table);
     this.emit('seatReleased', { clientId, tableId });
   }
 
   // Players report when a hand starts and ends, which drives the in_game status
+  // On multiplayer tables the server's round decides this, so reports are ignored mid-round.
   setInHand(clientId, inHand) {
     const current = this.seatOf(clientId);
     if (!current || current.seat.reservedUntil || current.seat.inHand === inHand) return null;
+    if (current.table.round && current.table.round.phase !== 'betting') return null;
 
     current.seat.inHand = inHand;
     this._changed(current.table);
@@ -282,6 +314,108 @@ class TableStore extends EventEmitter {
   stop() {
     for (const timer of this.holdTimers.values()) clearTimeout(timer);
     this.holdTimers.clear();
+    for (const timer of this.roundTimers.values()) clearTimeout(timer);
+    this.roundTimers.clear();
+  }
+
+  // Shared round: place or change a bet while the table is betting
+  bet(clientId, amount) {
+    const { table, seat } = this._roundSeat(clientId);
+    round.placeBet(table, seat, amount);
+    this._roundChanged(table);
+    return { bet: seat.bet };
+  }
+
+  // Shared round: hit, stand, double or split on your turn
+  action(clientId, type) {
+    const { table, seat } = this._roundSeat(clientId);
+    round.act(table, seat, type);
+    this._roundChanged(table);
+    return {};
+  }
+
+  _roundSeat(clientId) {
+    const current = this.seatOf(clientId);
+    if (!current || current.seat.reservedUntil) {
+      throw new TableError('not_seated', 'Join a table first.');
+    }
+    if (!current.table.round) {
+      throw new TableError('solo_table', 'This table plays solo hands.');
+    }
+    return current;
+  }
+
+  // Runs the round forward (dealing, timers, dealer, next hand) after any change,
+  // then sends the new state to everyone at the table.
+  _roundChanged(table) {
+    const r = table.round;
+    if (!r || !this.tables.has(table.id)) return;
+
+    if (table.seats.length === 0) {
+      this._clearRoundTimer(table);
+      round.resetRound(table);
+    } else if (r.phase === 'betting' && round.everyoneHasBet(table)) {
+      round.deal(table);
+    }
+
+    const current = table.round;
+    let key = null;
+    let ms = 0;
+    let onTimeout = null;
+
+    if (current.phase === 'betting' && round.anyBets(table)) {
+      key = 'bet';
+      ms = this.timing.betMs;
+      onTimeout = () => {
+        if (!round.deal(table)) current.timerKey = null;
+      };
+    } else if (current.phase === 'playing') {
+      const seat = table.seats.find(s => s.index === current.turn.seat);
+      const cards = seat?.hands[current.turn.hand]?.cards.length ?? 0;
+      key = `turn:${current.turn.seat}:${current.turn.hand}:${cards}:${seat?.hands.length}`;
+      ms = this.timing.turnMs;
+      onTimeout = () => round.act(table, seat, 'stand');
+    } else if (current.phase === 'dealer') {
+      key = 'dealer';
+      ms = this.timing.dealerMs;
+      onTimeout = () => round.playDealerAndSettle(table);
+    } else if (current.phase === 'settled') {
+      key = 'settled';
+      ms = this.timing.settleMs;
+      onTimeout = () => round.resetRound(table);
+    }
+
+    if (key === null) {
+      this._clearRoundTimer(table);
+      current.timerKey = null;
+      current.deadline = null;
+    } else if (key !== current.timerKey) {
+      current.timerKey = key;
+      current.deadline = this.now() + ms;
+      this._clearRoundTimer(table);
+      const timer = setTimeout(() => {
+        this.roundTimers.delete(table.id);
+        if (table.round !== current || current.timerKey !== key) return;
+        try {
+          onTimeout();
+        } catch (error) {
+          console.error('Round step failed:', error);
+          round.resetRound(table);
+        }
+        this._roundChanged(table);
+      }, ms);
+      timer.unref?.();
+      this.roundTimers.set(table.id, timer);
+    }
+
+    // Lobby status (In game / Waiting) only changes when hands start or end
+    if (statusOf(table) !== table.status) this._changed(table);
+    this.emit('round', table.id, round.roundView(table, this.now()));
+  }
+
+  _clearRoundTimer(table) {
+    clearTimeout(this.roundTimers.get(table.id));
+    this.roundTimers.delete(table.id);
   }
 
   _newTable(fields) {
@@ -304,15 +438,27 @@ class TableStore extends EventEmitter {
       inviteCode,
       createdAt: new Date(this.now()),
       emptySince: null,
-      ...fields
+      ...fields,
+      round: fields.solo ? null : round.newRound()
     };
   }
 
-  _takeSeat(table, client) {
+  _takeSeat(table, client, chips) {
     let index = 0;
     while (table.seats.some(s => s.index === index)) index++;
 
-    const seat = { index, clientId: client.clientId, name: client.name, inHand: false, reservedUntil: null };
+    // The browser carries its balance between tables (accounts don't store chips yet)
+    const balance = Number.isFinite(chips) && chips >= 0 ? Math.min(Math.floor(chips), MAX_CHIPS) : STARTING_CHIPS;
+    const seat = {
+      index,
+      clientId: client.clientId,
+      name: client.name,
+      inHand: false,
+      reservedUntil: null,
+      chips: balance,
+      bet: 0,
+      hands: []
+    };
     table.seats.push(seat);
     table.seats.sort((a, b) => a.index - b.index);
     return seat;
@@ -353,6 +499,7 @@ class TableStore extends EventEmitter {
     };
   }
 
+
   // Call after every change: refreshes status/idle time, saves, and tells the lobbies
   _changed(table, event = 'updated') {
     table.status = statusOf(table);
@@ -377,5 +524,6 @@ module.exports = {
   publicView,
   MAX_SEATS,
   SEAT_HOLD_MS,
-  IDLE_TABLE_MS
+  IDLE_TABLE_MS,
+  ROUND_TIMING
 };

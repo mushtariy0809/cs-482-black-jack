@@ -36,9 +36,10 @@ export function compareHands(player, dealer) {
 export function resolvePayout(money, bet, result, player) {
   const isBlackjack = scoreHand(player).blackjack;
   if (result === 'player') {
-    const winnings = bet * 2;
+    const winnings = isBlackjack ? bet * 2.5 : bet * 2;
     return money + winnings;
-  } else if (result === 'push') {
+  } 
+  else if (result === 'push') {
     return money + bet;
   }
   return money;
