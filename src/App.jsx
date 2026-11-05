@@ -268,47 +268,50 @@ const handlePlayerHit = () => {
       //transform: 'translateY(-10px)'
     }}
   >
-    {(playerSeat.hands && playerSeat.hands.length > 0 
-      ? playerSeat.hands.map(h => h.cards || h) 
-      : [playerSeat.hand || []]
-    ).map((handCards, handIdx) => {
-      const isActiveHand = playerSeat.hands?.length > 1 && playerSeat.activeHandIndex === handIdx;
-      return (
-        <div 
-          key={handIdx}
-          style={{ 
-            display: 'inline-flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            background: 'transparent',
-            padding: '2px 4px',
-            borderRadius: '6px',
-            border: isActiveHand ? '1px solid #f9e1b2' : '1px solid transparent',
-            boxShadow: isActiveHand ? '0 0 6px rgba(249, 225, 178, 0.3)' : 'none'
-          }}
-        >
-          {handCards.map((c, i) => (
+   {(playerSeat.hands && playerSeat.hands.length > 0 
+          ? playerSeat.hands.map(h => h.cards || h) 
+          : [playerSeat.hand || []]
+        ).map((handCards, handIdx) => {
+          const isActiveHand = playerSeat.hands?.length > 1 && playerSeat.activeHandIndex === handIdx;
+          return (
             <div 
-              key={c.id || i} 
+              key={handIdx}
               style={{ 
-                transform: 'scale(0.420)', 
-                transformOrigin: 'bottom center',
-                marginLeft: i === 0 ? '0' : '-64px', 
-                zIndex: i,
-                transition: 'transform 0.15s ease-out'
+                display: 'inline-flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                background: 'transparent',
+                padding: '2px 4px',
+                borderRadius: '6px',
+                border: isActiveHand ? '1px solid #f9e1b2' : '1px solid transparent',
+                boxShadow: isActiveHand ? '0 0 6px rgba(249, 225, 178, 0.3)' : 'none'
               }}
             >
-              <DealtCard 
-                front={<Card card={c} />} 
-                delay={dealDelay('player', i)} 
-              />
+              {(handCards || []).map((c, i) => {
+                const cardObj = typeof c === 'string' ? { suit: c.slice(-1), value: c.slice(0, -1) } : c;
+                return (
+                  <div 
+                    key={c.id || c.key || i} 
+                    style={{ 
+                      transform: 'scale(0.420)', 
+                      transformOrigin: 'bottom center',
+                      marginLeft: i === 0 ? '0' : '-64px', 
+                      zIndex: i,
+                      transition: 'transform 0.15s ease-out'
+                    }}
+                  >
+                    <DealtCard 
+                      front={<Card card={cardObj} />} 
+                      delay={dealDelay('player', i)} 
+                    />
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-      );
-    })}
-  </div>
-)}
+          );
+        })}
+      </div>
+    )}
 
         {/* 🪑 THE SEAT INFO BOX */}
         <div 
@@ -1363,36 +1366,36 @@ export default function App() {
    });
  }, [tables, table?.id]);
 
- useEffect(() => {
+useEffect(() => {
    if (!table || !tables) return;
 
    const currentTableData = tables.find(t => t.id === table.id);
    if (!currentTableData || !currentTableData.seats) return;
 
    setTableState(prev => {
-     const updatedSeats = [...prev.seats];
+     const updatedSeats = Array(7).fill(null);
      
      currentTableData.seats.forEach((serverSeat, idx) => {
-       // Check if this seat belongs to you
-       const isMySeat = (mySeat?.seat === idx) || (idx === 0);
-
        if (serverSeat) {
-         updatedSeats[idx] = {
-           name: serverSeat.name || `Player ${idx + 1}`,
+         const seatIdx = serverSeat.seat ?? idx;
+         const isMySeat = (mySeat?.seat === seatIdx) || (seatIdx === (mySeat?.seat ?? 0));
+
+         updatedSeats[seatIdx] = {
+           name: serverSeat.name || `Player ${seatIdx + 1}`,
            chips: serverSeat.chips ?? 1000,
-           hand: isMySeat ? (game?.player || updatedSeats[idx]?.hand || []) : (serverSeat.hand || []),
-           hands: isMySeat ? (game?.hands || updatedSeats[idx]?.hands || null) : (serverSeat.hands || null),
+           // Ensure remote players' hands are pulled directly from serverSeat.hand / hands
+           hand: isMySeat ? (game?.player || []) : (serverSeat.hand || serverSeat.cards || []),
+           hands: isMySeat ? (game?.hands || null) : (serverSeat.hands || null),
            activeHandIndex: isMySeat ? (game?.activeHandIndex ?? 0) : (serverSeat.activeHandIndex ?? 0),
            phase: serverSeat.phase || 'playing'
          };
-       } else {
-         updatedSeats[idx] = null;
        }
      });
 
      return {
        ...prev,
        seats: updatedSeats,
+       dealer: currentTableData.dealer || prev.dealer, // 👈 Sync shared dealer hand
        phase: currentTableData.phase || prev.phase,
        activeSeatIndex: currentTableData.activeSeatIndex ?? prev.activeSeatIndex
      };
@@ -1447,7 +1450,7 @@ function enterLobby(newPlayer) {
 async function sitAt(joinedTable) {
   setTable(joinedTable);
   
-  // 1. Tell the WebSocket server we are joining this table
+  // 1. Join table via socket server
   const result = await joinTable({ tableId: joinedTable.id });
   
   if (!result.ok) {
@@ -1456,39 +1459,23 @@ async function sitAt(joinedTable) {
     return;
   }
 
-  // 2. Start a fresh local game session for yourself
+  // 2. Start local game instance
   setGame(startGame(chips));
 
-  // 3. Populate the 7 seats using the server's real table data and assigned seat index
+  // 3. Set up seats using the server's assigned seat index (result.seat)
   setTableState(prev => {
     const newSeats = Array(7).fill(null);
-    
-    // Find the live table data from the socket connection if available
-    const liveTable = tables.find(t => t.id === joinedTable.id) || joinedTable;
-    
-    if (liveTable?.seats && Array.isArray(liveTable.seats)) {
-      liveTable.seats.forEach((seatData, idx) => {
-        if (seatData) {
-          newSeats[idx] = { 
-            name: seatData.name || `Player ${idx + 1}`, 
-            chips: seatData.chips || 1000, 
-            hand: seatData.hand || [], 
-            phase: 'playing' 
-          };
-        }
-      });
-    } else {
-      // Fallback using the server's assigned mySeat.seat index
-      const assignedSeat = result.seat ?? 0;
-      newSeats[assignedSeat] = { 
-        name: player?.name || 'Guest', 
-        chips, 
-        hand: [], 
-        phase: 'playing' 
-      };
-    }
-    
-    return { ...prev, seats: newSeats, phase: 'playing' };
+    const assignedSeatIndex = result.seat ?? 0;
+
+    // Place current player at their specific server-assigned seat
+    newSeats[assignedSeatIndex] = { 
+      name: player?.name || 'Guest', 
+      chips, 
+      hand: [], 
+      phase: 'playing' 
+    };
+
+    return { ...prev, seats: newSeats, phase: 'waiting' };
   });
 
   setScreen('game');
