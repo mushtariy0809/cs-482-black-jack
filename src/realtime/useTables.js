@@ -126,3 +126,7 @@ function getState() {
 export function useTables() {
   return useSyncExternalStore(subscribe, getState, getState);
 }
+
+export async function updateHand(handData) {
+  return request('seat:update', handData);
+}

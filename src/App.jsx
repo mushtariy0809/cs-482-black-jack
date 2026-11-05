@@ -12,7 +12,7 @@ import TableAds from './table/TableAds.jsx';
 import SoundButton from './sound/SoundButton.jsx';
 import { installUiSounds, preload, setMusic } from './sound/SoundManager.js';
 import ConnectionPill from './realtime/ConnectionPill.jsx';
-import { startTables, leaveTable, setInHand } from './realtime/useTables.js';
+import { startTables, leaveTable, setInHand, useTables, joinTable, updateHand } from './realtime/useTables.js';
 import './styles.css';
 import { usePlayerTimer } from './timer.js';
 import { createMultiplayerTable, getNextClockwiseSeat } from './tableManager.js';
@@ -1268,6 +1268,8 @@ export default function App() {
  const [table, setTable] = useState(null);
  const [chips, setChips] = useState(1000);
 
+ const { tables, mySeat } = useTables();
+
  const [tableState, setTableState] = useState(() => createMultiplayerTable('table-1'));
 
  const timeLeft = usePlayerTimer(game, setGame);
@@ -1328,6 +1330,75 @@ export default function App() {
     });
   }, [game?.player, game?.hands, game?.activeHandIndex]);
 
+  useEffect(() => {
+   if (!table || !tables) return;
+
+   const currentTableData = tables.find(t => t.id === table.id);
+   if (!currentTableData || !currentTableData.seats) return;
+
+   setTableState(prev => {
+     const updatedSeats = [...prev.seats];
+     
+     currentTableData.seats.forEach((serverSeat, idx) => {
+       if (serverSeat) {
+         updatedSeats[idx] = {
+           name: serverSeat.name || `Player ${idx + 1}`,
+           chips: serverSeat.chips ?? 1000,
+           hand: serverSeat.hand || [],
+           hands: serverSeat.hands || null,
+           activeHandIndex: serverSeat.activeHandIndex ?? 0,
+           phase: serverSeat.phase || 'playing'
+         };
+       } else {
+         updatedSeats[idx] = null;
+       }
+     });
+
+     return {
+       ...prev,
+       seats: updatedSeats,
+       phase: currentTableData.phase || prev.phase,
+       activeSeatIndex: currentTableData.activeSeatIndex ?? prev.activeSeatIndex
+     };
+   });
+ }, [tables, table?.id]);
+
+ useEffect(() => {
+   if (!table || !tables) return;
+
+   const currentTableData = tables.find(t => t.id === table.id);
+   if (!currentTableData || !currentTableData.seats) return;
+
+   setTableState(prev => {
+     const updatedSeats = [...prev.seats];
+     
+     currentTableData.seats.forEach((serverSeat, idx) => {
+       // Check if this seat belongs to you
+       const isMySeat = (mySeat?.seat === idx) || (idx === 0);
+
+       if (serverSeat) {
+         updatedSeats[idx] = {
+           name: serverSeat.name || `Player ${idx + 1}`,
+           chips: serverSeat.chips ?? 1000,
+           hand: isMySeat ? (game?.player || updatedSeats[idx]?.hand || []) : (serverSeat.hand || []),
+           hands: isMySeat ? (game?.hands || updatedSeats[idx]?.hands || null) : (serverSeat.hands || null),
+           activeHandIndex: isMySeat ? (game?.activeHandIndex ?? 0) : (serverSeat.activeHandIndex ?? 0),
+           phase: serverSeat.phase || 'playing'
+         };
+       } else {
+         updatedSeats[idx] = null;
+       }
+     });
+
+     return {
+       ...prev,
+       seats: updatedSeats,
+       phase: currentTableData.phase || prev.phase,
+       activeSeatIndex: currentTableData.activeSeatIndex ?? prev.activeSeatIndex
+     };
+   });
+ }, [tables, table?.id, game?.player, game?.hands, game?.activeHandIndex, mySeat?.seat]);
+
  // Tell the lobby when a hand is in progress (shows the table as "In game")
  const inHand = screen === 'game' && Boolean(game) && game.phase !== 'ready' && game.phase !== 'finished';
  useEffect(() => {
@@ -1373,24 +1444,52 @@ function enterLobby(newPlayer) {
   setScreen('lobby');
 }
 
-function sitAt(joinedTable) {
+async function sitAt(joinedTable) {
   setTable(joinedTable);
+  
+  // 1. Tell the WebSocket server we are joining this table
+  const result = await joinTable({ tableId: joinedTable.id });
+  
+  if (!result.ok) {
+    alert(result.message || 'Could not join table');
+    setScreen('lobby');
+    return;
+  }
+
+  // 2. Start a fresh local game session for yourself
   setGame(startGame(chips));
 
+  // 3. Populate the 7 seats using the server's real table data and assigned seat index
   setTableState(prev => {
-   const newSeats = Array(7).fill(null);
-   if (joinedTable?.players && Array.isArray(joinedTable.players)) {
-     joinedTable.players.forEach((p, idx) => {
-       if (idx < 7) {
-         newSeats[idx] = { name: p.name, chips: p.chips || 1000, hand: [], phase: 'playing' };
-       }
-     });
-   } else {
-     // Fallback: put current player in seat 0
-     newSeats[0] = { name: player?.name || 'Guest', chips, hand: [], phase: 'playing' };
-   }
-   return { ...prev, seats: newSeats, phase: 'playing' };
- });
+    const newSeats = Array(7).fill(null);
+    
+    // Find the live table data from the socket connection if available
+    const liveTable = tables.find(t => t.id === joinedTable.id) || joinedTable;
+    
+    if (liveTable?.seats && Array.isArray(liveTable.seats)) {
+      liveTable.seats.forEach((seatData, idx) => {
+        if (seatData) {
+          newSeats[idx] = { 
+            name: seatData.name || `Player ${idx + 1}`, 
+            chips: seatData.chips || 1000, 
+            hand: seatData.hand || [], 
+            phase: 'playing' 
+          };
+        }
+      });
+    } else {
+      // Fallback using the server's assigned mySeat.seat index
+      const assignedSeat = result.seat ?? 0;
+      newSeats[assignedSeat] = { 
+        name: player?.name || 'Guest', 
+        chips, 
+        hand: [], 
+        phase: 'playing' 
+      };
+    }
+    
+    return { ...prev, seats: newSeats, phase: 'playing' };
+  });
 
   setScreen('game');
 }
