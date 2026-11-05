@@ -58,9 +58,15 @@ function publicView(table) {
     players: table.seats.length,
     seats: table.seats.map(seat => ({
       index: seat.index,
+      clientId: seat.clientId,
       name: seat.name,
-      reserved: Boolean(seat.reservedUntil)
+      reserved: Boolean(seat.reservedUntil),
+      hand: seat.hand || [],
+      hands: seat.hands || null,
+      activeHandIndex: seat.activeHandIndex ?? 0,
+      phase: seat.phase || 'playing'
     })),
+    dealer: table.dealer || null,
     minBet: table.minBet,
     maxBet: table.maxBet,
     status: statusOf(table),
@@ -351,6 +357,24 @@ class TableStore extends EventEmitter {
       expiresAt: seat.reservedUntil.getTime(),
       forfeited
     };
+  }
+
+  updateSeatCards(clientId, cardData) {
+    const current = this.seatOf(clientId);
+    if (!current) return null;
+
+    const { table, seat } = current;
+    seat.hand = cardData.hand || [];
+    seat.hands = cardData.hands || null;
+    seat.activeHandIndex = cardData.activeHandIndex ?? 0;
+    seat.phase = cardData.phase || 'playing';
+
+    if (cardData.dealer) {
+      table.dealer = cardData.dealer;
+    }
+
+    this._changed(table);
+    return publicView(table);
   }
 
   // Call after every change: refreshes status/idle time, saves, and tells the lobbies

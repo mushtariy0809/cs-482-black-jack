@@ -78,6 +78,8 @@ function attachTableSockets(io, store) {
       return {};
     });
 
+    handle('seat:update', payload => store.updateSeatCards(client.clientId, payload));
+
     handle('table:create', input => store.create(input, client));
     handle('table:join', input => store.join(input, client));
     handle('table:leave', () => ({ reservation: store.leave(client.clientId) }));

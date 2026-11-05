@@ -1340,67 +1340,57 @@ export default function App() {
    if (!currentTableData || !currentTableData.seats) return;
 
    setTableState(prev => {
-     const updatedSeats = [...prev.seats];
-     
-     currentTableData.seats.forEach((serverSeat, idx) => {
-       if (serverSeat) {
-         updatedSeats[idx] = {
-           name: serverSeat.name || `Player ${idx + 1}`,
-           chips: serverSeat.chips ?? 1000,
-           hand: serverSeat.hand || [],
-           hands: serverSeat.hands || null,
-           activeHandIndex: serverSeat.activeHandIndex ?? 0,
-           phase: serverSeat.phase || 'playing'
-         };
-       } else {
-         updatedSeats[idx] = null;
-       }
-     });
-
-     return {
-       ...prev,
-       seats: updatedSeats,
-       phase: currentTableData.phase || prev.phase,
-       activeSeatIndex: currentTableData.activeSeatIndex ?? prev.activeSeatIndex
-     };
-   });
- }, [tables, table?.id]);
-
-useEffect(() => {
-   if (!table || !tables) return;
-
-   const currentTableData = tables.find(t => t.id === table.id);
-   if (!currentTableData || !currentTableData.seats) return;
-
-   setTableState(prev => {
      const updatedSeats = Array(7).fill(null);
      
-     currentTableData.seats.forEach((serverSeat, idx) => {
-       if (serverSeat) {
-         const seatIdx = serverSeat.seat ?? idx;
-         const isMySeat = (mySeat?.seat === seatIdx) || (seatIdx === (mySeat?.seat ?? 0));
+     currentTableData.seats.forEach((serverSeat) => {
+       const seatIdx = serverSeat.index ?? 0;
+       
+       // Check if this server seat belongs to your client
+       const isMySeat = serverSeat.clientId === mySeat?.clientId || (mySeat?.seat === seatIdx);
 
-         updatedSeats[seatIdx] = {
-           name: serverSeat.name || `Player ${seatIdx + 1}`,
-           chips: serverSeat.chips ?? 1000,
-           // Ensure remote players' hands are pulled directly from serverSeat.hand / hands
-           hand: isMySeat ? (game?.player || []) : (serverSeat.hand || serverSeat.cards || []),
-           hands: isMySeat ? (game?.hands || null) : (serverSeat.hands || null),
-           activeHandIndex: isMySeat ? (game?.activeHandIndex ?? 0) : (serverSeat.activeHandIndex ?? 0),
-           phase: serverSeat.phase || 'playing'
-         };
-       }
+       updatedSeats[seatIdx] = {
+         name: serverSeat.name || `Player ${seatIdx + 1}`,
+         chips: serverSeat.chips ?? 1000,
+         // Keep your local cards if it's your seat, otherwise show remote player cards
+         hand: isMySeat ? (game?.player || []) : (serverSeat.hand || []),
+         hands: isMySeat ? (game?.hands || null) : (serverSeat.hands || null),
+         activeHandIndex: isMySeat ? (game?.activeHandIndex ?? 0) : (serverSeat.activeHandIndex ?? 0),
+         phase: serverSeat.phase || 'playing'
+       };
      });
 
      return {
        ...prev,
        seats: updatedSeats,
-       dealer: currentTableData.dealer || prev.dealer, // 👈 Sync shared dealer hand
+       dealer: currentTableData.dealer || prev.dealer, // Sync shared dealer cards
        phase: currentTableData.phase || prev.phase,
        activeSeatIndex: currentTableData.activeSeatIndex ?? prev.activeSeatIndex
      };
    });
- }, [tables, table?.id, game?.player, game?.hands, game?.activeHandIndex, mySeat?.seat]);
+
+   // Also sync the dealer into local game state if the server has dealer cards
+   if (currentTableData.dealer && currentTableData.dealer.length > 0) {
+     setGame(prevGame => {
+       if (!prevGame) return prevGame;
+       if (JSON.stringify(prevGame.dealer) !== JSON.stringify(currentTableData.dealer)) {
+         return { ...prevGame, dealer: currentTableData.dealer };
+       }
+       return prevGame;
+     });
+   }
+ }, [tables, table?.id, game?.player, game?.hands, game?.activeHandIndex, mySeat?.clientId, mySeat?.seat]);
+
+useEffect(() => {
+    if (!table || !game) return;
+
+    updateHand({
+      hand: game.player || [],
+      hands: game.hands || null,
+      activeHandIndex: game.activeHandIndex ?? 0,
+      phase: game.phase,
+      dealer: game.dealer || []
+    });
+  }, [game?.player, game?.hands, game?.activeHandIndex, game?.phase, game?.dealer, table?.id]);
 
  // Tell the lobby when a hand is in progress (shows the table as "In game")
  const inHand = screen === 'game' && Boolean(game) && game.phase !== 'ready' && game.phase !== 'finished';
