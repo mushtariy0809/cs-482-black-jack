@@ -1,0 +1,220 @@
+/* ---- Multiplayer table (MultiplayerGame.jsx) ---- */
+
+.mp-table {
+  justify-content: flex-start;
+  padding-bottom: 150px;
+}
+
+.mp-message {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  text-align: center;
+}
+
+.mp-timer {
+  font: 600 16px Inter, system-ui, sans-serif;
+  color: var(--gold);
+}
+
+.mp-timer.is-low,
+.mp-seat-timer.is-low {
+  color: #ef4444;
+}
+
+.mp-my-hands {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  width: 100%;
+}
+
+.mp-my-hands > .hand {
+  width: auto;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.mp-my-hands > .mp-active-hand {
+  border-color: var(--gold-line);
+  box-shadow: 0 0 14px rgba(242, 211, 136, 0.25);
+}
+
+/* Seats along the rail, left to right in turn order */
+.mp-seats {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+  width: min(900px, 100%);
+  margin-top: auto;
+}
+
+.mp-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mp-seat-hands {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.mp-mini-hand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.mp-mini-hand.is-active {
+  border-color: var(--gold-line);
+}
+
+/* Full-size cards drawn at a smaller scale; zoom keeps the layout box small too */
+.mp-mini-cards {
+  display: flex;
+  zoom: 0.42;
+}
+
+.mp-mini-cards .card + .card {
+  margin-left: -52px;
+}
+
+.mp-mini-total {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  color: #f4ecd6;
+  white-space: nowrap;
+}
+
+.mp-result {
+  font-weight: 700;
+}
+
+.mp-result-player {
+  color: #34d399;
+}
+
+.mp-result-dealer {
+  color: #f87171;
+}
+
+.mp-result-push {
+  color: var(--gold);
+}
+
+.mp-seat-box {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  font-size: 12px;
+  line-height: 1.35;
+  transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+}
+
+.mp-seat.is-me .mp-seat-box {
+  border-color: var(--gold-line);
+}
+
+.mp-seat.is-turn .mp-seat-box {
+  border: 2px solid var(--gold);
+  background: rgba(242, 211, 136, 0.16);
+  box-shadow: 0 0 12px rgba(242, 211, 136, 0.35);
+}
+
+.mp-seat.is-away {
+  opacity: 0.55;
+}
+
+.mp-seat-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.mp-seat-number {
+  color: #b9c2bd;
+  font-size: 11px;
+}
+
+.mp-seat-timer {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.mp-seat-name {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mp-seat-chips {
+  color: #34d399;
+  font-size: 11px;
+}
+
+.mp-seat-empty,
+.mp-seat-away {
+  display: block;
+  font-style: italic;
+  opacity: 0.6;
+  font-size: 11px;
+}
+
+.mp-seat.is-empty .mp-seat-box {
+  text-align: center;
+  opacity: 0.4;
+}
+
+.mp-waiting {
+  margin: 0;
+  align-self: center;
+  color: #d9d2bd;
+}
+
+.mp-error {
+  width: 100%;
+  margin: 0;
+  text-align: center;
+  color: #fca5a5;
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .mp-table {
+    padding-bottom: 16px;
+  }
+
+  .mp-seats {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  }
+}
+
+.table-loading {
+  padding: 40px 16px;
+  text-align: center;
+  color: #d9d2bd;
+}

@@ -4,10 +4,12 @@
 // client -> server (all take an optional ack callback that gets { ok, ...result } or { ok: false, code, message })
 //   lobby:subscribe              start receiving table events, replies with tables:snapshot
 //   lobby:unsubscribe
-//   table:create  { name, visibility, password?, mode }   creator is seated as a player
-//   table:join    { tableId } or { inviteCode }, plus password? for private tables
+//   table:create  { name, visibility, password?, mode, chips? }   creator is seated as a player
+//   table:join    { tableId } or { inviteCode }, plus password? and chips? (balance to sit down with)
 //   table:leave                  seat is held for 10 seconds
-//   seat:hand     { inHand }     the player's hand started or ended
+//   seat:hand     { inHand }     solo tables only: the player's local hand started or ended
+//   round:bet     { amount }     multiplayer tables: place or change your bet while betting
+//   round:action  { type }       multiplayer tables: 'hit' | 'stand' | 'double' | 'split' on your turn
 //
 // server -> client
 //   tables:snapshot  [table]     full list, sent after lobby:subscribe
@@ -16,6 +18,7 @@
 //   table:removed    tableId
 //   seat:reserved    { tableId, tableName, seat, expiresAt, forfeited }   only to that player
 //   seat:released    { tableId }                                          only to that player
+//   table:state      round view (see round.js roundView)   to everyone seated at a multiplayer table
 
 function cleanName(name) {
   const trimmed = String(name ?? '').trim().slice(0, 24);
@@ -25,6 +28,8 @@ function cleanName(name) {
 function attachTableSockets(io, store) {
   // clientId -> number of open sockets (a player can have several tabs open)
   const openSockets = new Map();
+  // clientId -> table whose round updates their tabs receive
+  const tableRooms = new Map();
 
   io.use((socket, next) => {
     const { clientId, name } = socket.handshake.auth ?? {};
@@ -78,10 +83,29 @@ function attachTableSockets(io, store) {
       return {};
     });
 
-    handle('seat:update', payload => store.updateSeatCards(client.clientId, payload));
+    // Every tab of this player follows the table they sit at
+    function enterTableRoom(tableId) {
+      const previous = tableRooms.get(client.clientId);
+      if (previous && previous !== tableId) io.in(`client:${client.clientId}`).socketsLeave(`table:${previous}`);
+      tableRooms.set(client.clientId, tableId);
+      io.in(`client:${client.clientId}`).socketsJoin(`table:${tableId}`);
 
-    handle('table:create', input => store.create(input, client));
-    handle('table:join', input => store.join(input, client));
+      const state = store.roundState(tableId);
+      if (state) io.to(`client:${client.clientId}`).emit('table:state', state);
+    }
+
+    handle('table:create', async input => {
+      const result = await store.create(input, client);
+      enterTableRoom(result.table.id);
+      return result;
+    });
+    handle('table:join', async input => {
+      const result = await store.join(input, client);
+      enterTableRoom(result.table.id);
+      return result;
+    });
+    handle('round:bet', ({ amount }) => store.bet(client.clientId, amount));
+    handle('round:action', ({ type }) => store.action(client.clientId, type));
     handle('table:leave', () => ({ reservation: store.leave(client.clientId) }));
     handle('seat:hand', ({ inHand }) => store.setInHand(client.clientId, Boolean(inHand)) ?? {});
 
@@ -108,7 +132,12 @@ function attachTableSockets(io, store) {
   });
   store.on('seatReleased', ({ clientId, tableId }) => {
     io.to(`client:${clientId}`).emit('seat:released', { tableId });
+    if (tableRooms.get(clientId) === tableId) {
+      tableRooms.delete(clientId);
+      io.in(`client:${clientId}`).socketsLeave(`table:${tableId}`);
+    }
   });
+  store.on('round', (tableId, state) => io.to(`table:${tableId}`).emit('table:state', state));
 }
 
 module.exports = { attachTableSockets };

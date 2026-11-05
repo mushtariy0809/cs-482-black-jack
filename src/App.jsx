@@ -9,14 +9,13 @@ import LeaveConfirm from './table/LeaveConfirm.jsx';
 import TableFx, { DealtCard, ScorePill, dealDelay } from './table/TableFx.jsx';
 import PracticeRound from './tutorial/PracticeRound.jsx';
 import TableAds from './table/TableAds.jsx';
+import MultiplayerGame from './table/MultiplayerGame.jsx';
 import SoundButton from './sound/SoundButton.jsx';
 import { installUiSounds, preload, setMusic } from './sound/SoundManager.js';
 import ConnectionPill from './realtime/ConnectionPill.jsx';
-import { startTables, leaveTable, setInHand, useTables, joinTable, updateHand } from './realtime/useTables.js';
+import { startTables, leaveTable, setInHand, useTables, joinTable, setChipsHint } from './realtime/useTables.js';
 import './styles.css';
 import { usePlayerTimer } from './timer.js';
-import { createMultiplayerTable, getNextClockwiseSeat } from './tableManager.js';
-import { useMultiplayerTimer } from './multiPlayerTimer.js';
 
 const ASSETS = '/assets/';
 
@@ -101,7 +100,7 @@ function Card({ card, hidden = false }) {
   );
 }
 
-function Game({game,setGame,player,historySaved, bet, setBet, tableState, timeLeft, tableName = 'The Green Room', toolbar, onChangeTable}) {
+function Game({game,setGame,player,historySaved, bet, setBet, timeLeft, tableName = 'The Green Room', toolbar, onChangeTable}) {
 
   useEffect(() => {
     if (
@@ -215,146 +214,49 @@ const handlePlayerHit = () => {
   )}
 </div>
 
-{/* 7-PLAYER SEAT GRID */}
-<div 
-  className="multiplayer-table-stage" 
-  style={{ 
-    position: 'absolute', 
-    bottom: '140px', // 👈 Raised higher to clear bottom buttons
-    left: '50%', 
-    transform: 'translateX(-50%)', 
-    display: 'flex', 
-    justifyContent: 'center', 
-    alignItems: 'flex-end',
-    gap: '16px', 
-    width: '95%', 
-    maxWidth: '920px',
-    pointerEvents: 'none', 
-    zIndex: 5 
-  }}
->
-  {tableState?.seats?.map((playerSeat, seatIndex) => {
-    const isCurrentTurn = tableState.phase === 'playing' && tableState.activeSeatIndex === seatIndex;
-    
-    // U-Shape Arc Curve Offsets (Middle seats drop down, edge seats curve up)
-    const arcYOffsets = [-50, -25, 0, 15, 0, -25, -50];
-    const yOffset = arcYOffsets[seatIndex] || 0;
-
-    // Check if player has hands (supports split hands: hand 1 & hand 2)
-    const hands = playerSeat?.hands || (playerSeat?.hand ? [playerSeat.hand] : []);
-
-    return (
-      <div 
-        key={seatIndex} 
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          flex: '1',
-          maxWidth: '120px',
-          transform: `translateY(${yOffset}px)`,
-          pointerEvents: 'auto'
-        }}
-      >
-        {/* 🎴 CLEAN SIDE-BY-SIDE CARDS (SUPPORTS SPLITS: HAND 1 TOP, HAND 2 BOTTOM) */}
-  {playerSeat && (
-  <div 
-    style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      gap: '4px', 
-      marginBottom: '6px', 
-      alignItems: 'center',
-      //transform: 'translateY(-10px)'
-    }}
-  >
-   {(playerSeat.hands && playerSeat.hands.length > 0 
-          ? playerSeat.hands.map(h => h.cards || h) 
-          : [playerSeat.hand || []]
-        ).map((handCards, handIdx) => {
-          const isActiveHand = playerSeat.hands?.length > 1 && playerSeat.activeHandIndex === handIdx;
-          return (
-            <div 
-              key={handIdx}
-              style={{ 
-                display: 'inline-flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                background: 'transparent',
-                padding: '2px 4px',
-                borderRadius: '6px',
-                border: isActiveHand ? '1px solid #f9e1b2' : '1px solid transparent',
-                boxShadow: isActiveHand ? '0 0 6px rgba(249, 225, 178, 0.3)' : 'none'
-              }}
-            >
-              {(handCards || []).map((c, i) => {
-                const cardObj = typeof c === 'string' ? { suit: c.slice(-1), value: c.slice(0, -1) } : c;
-                return (
-                  <div 
-                    key={c.id || c.key || i} 
-                    style={{ 
-                      transform: 'scale(0.420)', 
-                      transformOrigin: 'bottom center',
-                      marginLeft: i === 0 ? '0' : '-64px', 
-                      zIndex: i,
-                      transition: 'transform 0.15s ease-out'
-                    }}
-                  >
-                    <DealtCard 
-                      front={<Card card={cardObj} />} 
-                      delay={dealDelay('player', i)} 
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    )}
-
-        {/* 🪑 THE SEAT INFO BOX */}
-        <div 
-          className={`seat-box ${isCurrentTurn ? 'active-seat' : ''}`}
+<div className="player-hand-container" style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap'}}>
+        {game.hands && game.hands.length > 0 ? (
+       game.hands.map((handObj, handIndex) => {
+        const isActive = game.phase === 'player' && game.activeHandIndex === handIndex;
+        const handScore = scoreHand(handObj.cards);
+        return (
+         <div 
+          key={handIndex} 
+          className={`hand ${isActive ? 'active-hand' : ''}`}
           style={{
-            width: '100%',
-            border: isCurrentTurn ? '2px solid var(--accent, #f59e0b)' : '1px solid rgba(255, 255, 255, 0.18)',
-            borderRadius: '10px',
-            padding: '6px 8px',
-            background: isCurrentTurn ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(6px)',
-            boxShadow: isCurrentTurn ? '0 0 12px rgba(245, 158, 11, 0.4)' : '0 4px 10px rgba(0,0,0,0.3)',
-            transition: 'all 0.3s ease'
+           border: isActive ? '2px solid var(--accent, #f59e0b)' : '2px solid transparent',
+           borderRadius: '12px',
+           padding: '12px',
+           background: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+           transition: 'all 0.2s ease'
           }}
-        >
-          <div className="seat-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px', fontSize: '0.65rem' }}>
-            <strong style={{ color: '#d1d5db' }}>Seat {seatIndex + 1}</strong>
-            {isCurrentTurn && (
-              <span style={{ color: timeLeft <= 5 ? '#ef4444' : '#f59e0b', fontWeight: 'bold' }}>
-                ⏱️{timeLeft}s
-              </span>
-            )}
+         >
+          <div className="cards">
+           {handObj.cards.map((c, i) => (
+            <DealtCard 
+             key={c.id || i} 
+             front={<Card card={c}/>} 
+             back={<Card hidden/>} 
+             delay={dealDelay('player', i)}
+            />
+           ))}
           </div>
-
-          {playerSeat ? (
-            <div className="seat-content">
-              <div className="player-name" style={{ fontSize: '0.7rem', fontWeight: '600', opacity: 0.95, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {playerSeat.name}
-              </div>
-              <div className="player-chips" style={{ fontSize: '0.65rem', color: '#10b981' }}>
-                ${playerSeat.chips}
-              </div>
-            </div>
-          ) : (
-            <div className="empty-seat" style={{ fontStyle: 'italic', opacity: '0.35', fontSize: '0.65rem', textAlign: 'center', padding: '2px 0' }}>
-              Empty
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  })}
-</div>
+          <ScorePill>
+           {game.hands.length > 1 ? `Hand ${handIndex + 1} ` : 'Your hand'} 
+           {handObj.bet ? `($${handObj.bet})` : ''} 
+           {handObj.cards.length ? ` · ${handScore.total}${handScore.blackjack ? ' · Blackjack' : handScore.bust ? ' · Bust' : handScore.soft ? ' · Soft' : ''}` : ''}
+           {isActive ? ' ◀ Active' : ''}
+          </ScorePill>
+         </div>
+        );
+       })
+      ) : (
+       <div className="hand">
+        <div className="cards">{game.player.map((c,i)=><DealtCard key={c.id} front={<Card card={c}/>} back={<Card hidden/>} delay={dealDelay('player',i)}/>)}</div>
+        <ScorePill>Your hand{game.player.length?` · ${p.total}${p.blackjack?' · Blackjack':p.bust?' · Bust':p.soft?' · Soft':''}`:''}</ScorePill>
+       </div>
+      )}
+     </div>
 
      {/* Controls bar (practice-controls: these buttons make card/chip sounds instead of a click) */}
      <div className="game-controls practice-controls">
@@ -383,12 +285,6 @@ const handlePlayerHit = () => {
          className="primary controls-main"
          onClick={() => {
           setGame(dealRound(game, bet));
-          setTableState(prev => ({ 
-            ...prev, 
-            phase: 'playing', 
-            activeSeatIndex: 0,
-            timerReset: Date.now() // 👈 Forces the timer hook to reset its countdown
-          }));
         }}
          disabled={bet > game.money || game.money <=0}
         >
@@ -400,12 +296,6 @@ const handlePlayerHit = () => {
         <button className="primary wide" 
         onClick={() => {
         setGame(startGame(game.money));
-        setTableState(prev => ({ 
-          ...prev, 
-          phase: 'playing', 
-          activeSeatIndex: 0,
-          timerReset: Date.now()
-        }));
       }}
         >
          Start a fresh game
@@ -1271,132 +1161,66 @@ export default function App() {
  const [table, setTable] = useState(null);
  const [chips, setChips] = useState(1000);
 
- const { tables, mySeat } = useTables();
+ const { tables, mySeat, tableState: liveTable, offline } = useTables();
 
- const [tableState, setTableState] = useState(() => createMultiplayerTable('table-1'));
+ // Multiplayer tables are run by the server (one shared deck, dealer and turn order).
+ // Solo Practice, and demo mode while the server is down, play the local game below.
+ const live = table ? tables.find(t => t.id === table.id) ?? table : null;
+ const shared = Boolean(table) && !table.solo && !offline;
+ const sharedState = shared && liveTable?.tableId === table.id ? liveTable : null;
+ const mySharedSeat = sharedState?.seats.find(s => s.index === mySeat?.seat) ?? null;
 
  const timeLeft = usePlayerTimer(game, setGame);
- 
- const gameRef = useRef(game);
- useEffect(() => {
-   gameRef.current = game;
- }, [game]);
-
- const handleJoinTable = (playerName = player?.name || 'You', startingChips = chips) => {
-  setTableState(prev => {
-    if (!prev || !prev.seats) return prev;
-
-    const nextSeats = [...prev.seats];
-    const emptyIndex = nextSeats.findIndex(s => s === null);
-
-    if (emptyIndex === -1){
-      alert('Table is full!');
-      return prev;
-    }
-
-    nextSeats[emptyIndex] = {
-      name: playerName,
-      chips: startingChips,
-      hand: [],
-      phase: 'playing'
-    };
-
-    return{
-      ...prev,
-      seats: nextSeats,
-      phase: prev.phase === 'waiting' ? 'playing' : prev.phase
-    };
-  });
- };
 
  useEffect(()=>{main.current?.focus();},[screen]);
  useEffect(() => {
   if (game) setChips(game.money);
  }, [game?.money]);
 
+ // At a shared table the server holds the balance; take it whenever it changes
  useEffect(() => {
-    if (!game || !tableState) return;
-    
-    setTableState(prev => {
-      if (!prev || !prev.seats) return prev;
-      const newSeats = [...prev.seats];
-      if (newSeats[0]) {
-        newSeats[0] = {
-          ...newSeats[0],
-          chips: game.money ?? newSeats[0].chips,
-          hand: game.player || [],
-          hands: game.hands || null, 
-          activeHandIndex: game.activeHandIndex ?? 0 
-        };
-      }
-      return { ...prev, seats: newSeats };
-    });
-  }, [game?.player, game?.hands, game?.activeHandIndex]);
+  if (mySharedSeat) setChips(mySharedSeat.chips);
+ }, [mySharedSeat?.chips]);
 
-  useEffect(() => {
-   if (!table || !tables) return;
+ // The balance to sit down with at the next table
+ useEffect(() => {
+  setChipsHint(chips);
+ }, [chips]);
 
-   const currentTableData = tables.find(t => t.id === table.id);
-   if (!currentTableData || !currentTableData.seats) return;
+ // Tell the lobby when a hand is in progress (shows the table as "In game").
+ // Shared tables: the server already knows.
+ const inHand = shared
+  ? Boolean(mySharedSeat?.hands.length) && ['playing', 'dealer'].includes(sharedState?.phase)
+  : screen === 'game' && Boolean(game) && game.phase !== 'ready' && game.phase !== 'finished';
+ useEffect(() => {
+  if (table && !shared) setInHand(inHand);
+ }, [inHand, table, shared]);
 
-   setTableState(prev => {
-     const updatedSeats = Array(7).fill(null);
-     
-     currentTableData.seats.forEach((serverSeat) => {
-       const seatIdx = serverSeat.index ?? 0;
-       
-       // Check if this server seat belongs to your client
-       const isMySeat = serverSeat.clientId === mySeat?.clientId || (mySeat?.seat === seatIdx);
+ // Save each settled shared hand to history (same endpoint as the solo game)
+ function saveSharedRound({ key, hands, dealer }) {
+  if (player?.type !== 'registered' || !player?.id || historySaved.current.has(key)) return;
+  historySaved.current.add(key);
+  const hand = hands[0];
+  const result = hand.result === 'player' ? 'win' : hand.result === 'dealer' ? 'loss' : 'push';
 
-       updatedSeats[seatIdx] = {
-         name: serverSeat.name || `Player ${seatIdx + 1}`,
-         chips: serverSeat.chips ?? 1000,
-         // Keep your local cards if it's your seat, otherwise show remote player cards
-         hand: isMySeat ? (game?.player || []) : (serverSeat.hand || []),
-         hands: isMySeat ? (game?.hands || null) : (serverSeat.hands || null),
-         activeHandIndex: isMySeat ? (game?.activeHandIndex ?? 0) : (serverSeat.activeHandIndex ?? 0),
-         phase: serverSeat.phase || 'playing'
-       };
-     });
-
-     return {
-       ...prev,
-       seats: updatedSeats,
-       dealer: currentTableData.dealer || prev.dealer, // Sync shared dealer cards
-       phase: currentTableData.phase || prev.phase,
-       activeSeatIndex: currentTableData.activeSeatIndex ?? prev.activeSeatIndex
-     };
+  fetch('http://localhost:5000/api/history', {
+   method: 'POST',
+   headers: { 'Content-Type': 'application/json' },
+   body: JSON.stringify({
+    playerId: player.id,
+    result,
+    playerScore: scoreHand(hand.cards).total,
+    dealerScore: scoreHand(dealer).total
+   })
+  })
+   .then(response => {
+    if (!response.ok) throw new Error('Could not save game history.');
+   })
+   .catch(error => {
+    historySaved.current.delete(key);
+    console.error('History error:', error);
    });
-
-   // Also sync the dealer into local game state if the server has dealer cards
-   if (currentTableData.dealer && currentTableData.dealer.length > 0) {
-     setGame(prevGame => {
-       if (!prevGame) return prevGame;
-       if (JSON.stringify(prevGame.dealer) !== JSON.stringify(currentTableData.dealer)) {
-         return { ...prevGame, dealer: currentTableData.dealer };
-       }
-       return prevGame;
-     });
-   }
- }, [tables, table?.id, game?.player, game?.hands, game?.activeHandIndex, mySeat?.clientId, mySeat?.seat]);
-
-useEffect(() => {
-    if (!table || !game) return;
-
-    updateHand({
-      hand: game.player || [],
-      hands: game.hands || null,
-      activeHandIndex: game.activeHandIndex ?? 0,
-      phase: game.phase,
-      dealer: game.dealer || []
-    });
-  }, [game?.player, game?.hands, game?.activeHandIndex, game?.phase, game?.dealer, table?.id]);
-
- // Tell the lobby when a hand is in progress (shows the table as "In game")
- const inHand = screen === 'game' && Boolean(game) && game.phase !== 'ready' && game.phase !== 'finished';
- useEffect(() => {
-  if (table) setInHand(inHand);
- }, [inHand, table]);
+ }
 
  const [confirmLeave, setConfirmLeave] = useState(false);
  // Table to join as soon as the lobby opens (tutorial's "Practice with bots")
@@ -1428,7 +1252,7 @@ function begin(){
 
 // Where "Play" and the logo lead
 function home() {
-  setScreen(game ? 'game' : player ? 'lobby' : 'start');
+  setScreen(game || table ? 'game' : player ? 'lobby' : 'start');
 }
 
 function enterLobby(newPlayer) {
@@ -1449,24 +1273,8 @@ async function sitAt(joinedTable) {
     return;
   }
 
-  // 2. Start local game instance
-  setGame(startGame(chips));
-
-  // 3. Set up seats using the server's assigned seat index (result.seat)
-  setTableState(prev => {
-    const newSeats = Array(7).fill(null);
-    const assignedSeatIndex = result.seat ?? 0;
-
-    // Place current player at their specific server-assigned seat
-    newSeats[assignedSeatIndex] = { 
-      name: player?.name || 'Guest', 
-      chips, 
-      hand: [], 
-      phase: 'playing' 
-    };
-
-    return { ...prev, seats: newSeats, phase: 'waiting' };
-  });
+  // 2. Solo/demo tables play a local game; shared tables wait for the server's table:state
+  setGame(joinedTable.solo || offline ? startGame(chips) : null);
 
   setScreen('game');
 }
@@ -1498,7 +1306,9 @@ function requestLeave() {
   else exitTable();
 }
 
-const stake = game?.hands?.reduce((sum, hand) => sum + hand.bet, 0) || game?.bet || 0;
+const stake = shared
+  ? mySharedSeat?.hands.reduce((sum, hand) => sum + hand.bet, 0) ?? 0
+  : game?.hands?.reduce((sum, hand) => sum + hand.bet, 0) || game?.bet || 0;
 
 // The game screen zooms its table itself (see Game) so its ad column never moves
 const screenMotion = { initial: false, animate: { opacity: 1 }, exit: { opacity: 1, transition: { duration: 0 } } };
@@ -1657,10 +1467,26 @@ return (
         />
       ) : screen === 'create' && player ? (
         <CreateTable onCreated={result => sitAt(result.table)} onCancel={() => setScreen('lobby')} />
+      ) : screen === 'game' && shared ? (
+        sharedState ? (
+          <MultiplayerGame
+            tableState={sharedState}
+            mySeatIndex={mySeat?.seat}
+            maxSeats={live?.maxSeats ?? 5}
+            Card={Card}
+            toolbar={<TableBar table={table} onLeave={requestLeave} />}
+            onChangeTable={requestLeave}
+            onRoundSettled={saveSharedRound}
+          />
+        ) : (
+          <>
+            <TableBar table={table} onLeave={requestLeave} />
+            <p className="table-loading" role="status">Taking your seat…</p>
+          </>
+        )
       ) : screen === 'game' && game ? (
         <Game
           game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet}
-          tableState={tableState}
           timeLeft={timeLeft}
           tableName={table?.name}
           toolbar={table && <TableBar table={table} onLeave={requestLeave} />}

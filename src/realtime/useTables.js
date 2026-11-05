@@ -17,13 +17,20 @@ const socket = io(SOCKET_URL, {
 // offline: true while showing demo tables because the server never answered
 // mySeat: { tableId, seat } after joining
 // reservation: { tableId, tableName, seat, expiresAt, forfeited } while a seat is held after leaving
+// tableState: the shared round at a multiplayer table (from the server), plus receivedAt for timers
 let state = {
   tables: [],
   connection: 'idle',
   offline: false,
   mySeat: null,
-  reservation: null
+  reservation: null,
+  tableState: null
 };
+// Chips the player sits down with (the app keeps the balance between tables)
+let chipsHint = null;
+export function setChipsHint(chips) {
+  chipsHint = chips;
+}
 const listeners = new Set();
 
 function setState(changes) {
@@ -42,6 +49,12 @@ socket.on('connect', () => {
   // A seat taken in demo mode doesn't exist on the server
   setState({ connection: 'online', offline: false, mySeat: state.offline ? null : state.mySeat });
   socket.emit('lobby:subscribe');
+  // Back after a dropped connection: take the held seat again (and get the table's state)
+  if (state.mySeat) {
+    socket.emit('table:join', { tableId: state.mySeat.tableId }, result => {
+      if (!result?.ok) setState({ mySeat: null, tableState: null });
+    });
+  }
 });
 socket.on('disconnect', () => setState({ connection: 'reconnecting' }));
 socket.on('connect_error', () => {
@@ -57,7 +70,12 @@ socket.on('tables:snapshot', tables => setState({ tables }));
 socket.on('table:created', upsert);
 socket.on('table:updated', upsert);
 socket.on('table:removed', tableId => setState({ tables: state.tables.filter(t => t.id !== tableId) }));
-socket.on('seat:reserved', reservation => setState({ reservation, mySeat: null }));
+socket.on('seat:reserved', reservation => setState({ reservation, mySeat: null, tableState: null }));
+// Can arrive just before the join reply, so it's kept even before mySeat is set;
+// the table screen only uses it when tableState.tableId matches mySeat.tableId.
+socket.on('table:state', tableState => {
+  setState({ tableState: { ...tableState, receivedAt: Date.now() } });
+});
 socket.on('seat:released', ({ tableId }) => {
   if (state.reservation?.tableId === tableId) setState({ reservation: null });
 });
@@ -91,22 +109,43 @@ export function startTables(name = 'Guest') {
   }
 }
 
+// Keeps a table:state that already arrived for this table
+function seated(result) {
+  if (!result.ok) return;
+  const sameTable = state.tableState?.tableId === result.table.id;
+  setState({
+    mySeat: { tableId: result.table.id, seat: result.seat },
+    reservation: null,
+    tableState: sameTable ? state.tableState : null
+  });
+}
+
 export async function joinTable({ tableId, inviteCode, password }) {
-  const result = await request('table:join', { tableId, inviteCode, password });
-  if (result.ok) setState({ mySeat: { tableId: result.table.id, seat: result.seat }, reservation: null });
+  const result = await request('table:join', { tableId, inviteCode, password, chips: chipsHint ?? undefined });
+  seated(result);
   return result;
 }
 
 export async function createTable(fields) {
-  const result = await request('table:create', fields);
-  if (result.ok) setState({ mySeat: { tableId: result.table.id, seat: result.seat }, reservation: null });
+  const result = await request('table:create', { ...fields, chips: chipsHint ?? undefined });
+  seated(result);
   return result;
 }
 
 export async function leaveTable() {
   const result = await request('table:leave');
-  setState({ mySeat: null });
+  setState({ mySeat: null, tableState: null });
   return result;
+}
+
+// Multiplayer tables: the server runs the round, the browser only asks
+export function placeBet(amount) {
+  return request('round:bet', { amount });
+}
+
+// type: 'hit' | 'stand' | 'double' | 'split'
+export function playAction(type) {
+  return request('round:action', { type });
 }
 
 // Tell the server a hand started or ended (drives the In game status)
@@ -127,6 +166,3 @@ export function useTables() {
   return useSyncExternalStore(subscribe, getState, getState);
 }
 
-export async function updateHand(handData) {
-  return request('seat:update', handData);
-}
