@@ -24,7 +24,9 @@ let state = {
   offline: false,
   mySeat: null,
   reservation: null,
-  tableState: null
+  tableState: null,
+  chatMessages: [],
+  privateMessages: [] 
 };
 // Chips the player sits down with (the app keeps the balance between tables)
 let chipsHint = null;
@@ -56,6 +58,19 @@ socket.on('connect', () => {
     });
   }
 });
+
+socket.on('table:private:message', message => {
+  setState({
+    privateMessages: [...state.privateMessages, message].slice(-200)
+  });
+});
+
+socket.on('table:chat:message', message => {
+  setState({
+    chatMessages: [...state.chatMessages, message].slice(-100)
+  });
+});
+
 socket.on('disconnect', () => setState({ connection: 'reconnecting' }));
 socket.on('connect_error', () => {
   // Never got a real list: show demo tables so the lobby isn't empty
@@ -98,9 +113,9 @@ async function request(event, payload = {}) {
 }
 
 // Connect (or reconnect with a new display name). Safe to call more than once.
-export function startTables(name = 'Guest') {
-  if (socket.auth.name !== name) {
-    socket.auth = { ...socket.auth, name };
+export function startTables(name = 'Guest', token) {
+  if (socket.auth.name !== name || socket.auth.token !== token) {
+    socket.auth = { ...socket.auth, name, token };
     if (socket.connected) socket.disconnect();
   }
   if (!socket.connected && !socket.active) {
@@ -116,7 +131,9 @@ function seated(result) {
   setState({
     mySeat: { tableId: result.table.id, seat: result.seat },
     reservation: null,
-    tableState: sameTable ? state.tableState : null
+    tableState: sameTable ? state.tableState : null,
+    chatMessages: sameTable ? state.chatMessages : [],
+    privateMessages: sameTable ? state.privateMessages : []
   });
 }
 
@@ -134,7 +151,7 @@ export async function createTable(fields) {
 
 export async function leaveTable() {
   const result = await request('table:leave');
-  setState({ mySeat: null, tableState: null });
+  setState({ mySeat: null, tableState: null, chatMessages: [], privateMessages: []});
   return result;
 }
 
@@ -153,6 +170,14 @@ export function setInHand(inHand) {
   return request('seat:hand', { inHand });
 }
 
+export function sendTableChat(message) {
+  return request('table:chat:send', { message });
+}
+
+export function sendPrivateTableChat(recipientSeat, message) {
+  return request('table:private:send', { recipientSeat, message });
+}
+
 function subscribe(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -165,4 +190,3 @@ function getState() {
 export function useTables() {
   return useSyncExternalStore(subscribe, getState, getState);
 }
-

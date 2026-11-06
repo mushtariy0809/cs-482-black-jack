@@ -1,6 +1,17 @@
 
 const bcrypt = require('bcryptjs');
 const Player = require('../models/Player');
+const jwt = require('jsonwebtoken');
+
+const generateToken = (player) => {
+  return jwt.sign(
+    {
+      playerId: player._id.toString()
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+};
 
 // Register a new player
 const registerPlayer = async (req, res) => {
@@ -50,6 +61,7 @@ const registerPlayer = async (req, res) => {
 
     return res.status(201).json({
       message: 'Account created successfully!',
+      token: generateToken(player),
       player: {
         id: player._id,
         username: player.username,
@@ -100,6 +112,7 @@ const loginPlayer = async (req, res) => {
 
     return res.json({
       message: 'Login successful!',
+      token: generateToken(player),
       player: {
         id: player._id,
         username: player.username,

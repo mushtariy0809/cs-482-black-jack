@@ -20,6 +20,8 @@
 //   seat:released    { tableId }                                          only to that player
 //   table:state      round view (see round.js roundView)   to everyone seated at a multiplayer table
 
+const jwt = require('jsonwebtoken');
+
 function cleanName(name) {
   const trimmed = String(name ?? '').trim().slice(0, 24);
   return trimmed || 'Guest';
@@ -32,13 +34,24 @@ function attachTableSockets(io, store) {
   const tableRooms = new Map();
 
   io.use((socket, next) => {
-    const { clientId, name } = socket.handshake.auth ?? {};
+    const { clientId, name, token } = socket.handshake.auth ?? {};
 
     if (typeof clientId !== 'string' || !/^[\w-]{8,64}$/.test(clientId)) {
       return next(new Error('clientId is required.'));
     }
 
-    socket.data.client = { clientId, name: cleanName(name) };
+    let playerId = null;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        playerId = decoded.playerId;
+      } catch {
+        return next(new Error('Invalid or expired login token.'));
+      }
+    }
+
+    socket.data.client = { clientId, name: cleanName(name), playerId };
     next();
   });
 
@@ -104,6 +117,135 @@ function attachTableSockets(io, store) {
       enterTableRoom(result.table.id);
       return result;
     });
+
+    handle('table:chat:send', ({ message }) => {
+
+      // Only registered players can use table chat, not guests
+      if (!client.playerId) {
+        const error = new Error('You must be logged in to use table chat.');
+        error.code = 'authentication_required';
+        throw error;
+      }
+
+      // The player must be seated at a table
+      const current = store.seatOf(client.clientId);
+
+      if (!current) {
+        const error = new Error('You must be seated at a table to chat.');
+        error.code = 'not_seated';
+        throw error;
+      }
+
+      if (typeof message !== 'string' || !message.trim()) {
+        const error = new Error('Please enter a message.');
+        error.code = 'invalid_message';
+        throw error;
+      }
+
+      const chatMessage = {
+        tableId: current.table.id,
+        playerId: client.playerId,
+        senderName: client.name,
+        text: message.trim().slice(0, 300),
+        sentAt: Date.now()
+      };
+
+      io.to(`table:${current.table.id}`).emit(
+        'table:chat:message',
+        chatMessage
+      );
+
+      return { message: chatMessage };
+    });
+
+    handle('table:private:send', async ({ recipientSeat, message }) => {
+      
+      // Both players must be registered
+      if (!client.playerId) {
+        const error = new Error('You must be logged in to use private chat.');
+        error.code = 'authentication_required';
+        throw error;
+      }
+
+      // Validate message
+      if (typeof message !== 'string' || !message.trim()) {
+        const error = new Error('Please enter a message.');
+        error.code = 'invalid_message';
+        throw error;
+      }
+
+      // Find the sender's current table
+      const current = store.seatOf(client.clientId);
+
+      if (!current || current.seat.reservedUntil) {
+        const error = new Error('You must be seated at a table.');
+        error.code = 'not_seated';
+        throw error;
+      }
+
+      // Find the recipient at the same table
+      if (!Number.isInteger(recipientSeat)) {
+        const error = new Error('Invalid recipient.');
+        error.code = 'invalid_recipient';
+        throw error;
+      }
+
+      const recipient = current.table.seats.find(
+        seat =>
+          seat.index === recipientSeat &&
+          seat.clientId !== client.clientId &&
+          !seat.reservedUntil
+      );
+
+      if (!recipient) {
+        const error = new Error('That player is no longer at your table.');
+        error.code = 'recipient_not_seated';
+        throw error;
+      }
+
+      // Verify the recipient is logged in
+      const recipientSockets = await io
+        .in(`client:${recipient.clientId}`)
+        .fetchSockets();
+
+      const registeredRecipient = recipientSockets.some(
+        recipientSocket => Boolean(recipientSocket.data.client.playerId)
+      );
+
+      if (!registeredRecipient) {
+        const error = new Error('That player must be logged in to receive private messages.');
+        error.code = 'recipient_not_authenticated';
+        throw error;
+      }
+
+      const privateMessage = {
+        tableId: current.table.id,
+        senderPlayerId: client.playerId,
+        recipientPlayerId: recipientSockets.find(
+          recipientSocket => recipientSocket.data.client.playerId
+        ).data.client.playerId,
+        senderName: client.name,
+        recipientName: recipient.name,
+        text: message.trim().slice(0, 300),
+        sentAt: Date.now(),
+        senderSeat: current.seat.index,
+        recipientSeat: recipient.index,
+      };
+
+      // Deliver only to the sender and recipient
+      io.to(`client:${client.clientId}`).emit(
+        'table:private:message',
+        privateMessage
+      );
+
+      io.to(`client:${recipient.clientId}`).emit(
+        'table:private:message',
+        privateMessage
+      );
+
+      return { message: privateMessage };
+    });
+
     handle('round:bet', ({ amount }) => store.bet(client.clientId, amount));
     handle('round:action', ({ type }) => store.action(client.clientId, type));
     handle('table:leave', () => ({ reservation: store.leave(client.clientId) }));

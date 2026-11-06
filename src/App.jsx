@@ -13,9 +13,10 @@ import MultiplayerGame from './table/MultiplayerGame.jsx';
 import SoundButton from './sound/SoundButton.jsx';
 import { installUiSounds, preload, setMusic } from './sound/SoundManager.js';
 import ConnectionPill from './realtime/ConnectionPill.jsx';
-import { startTables, leaveTable, setInHand, useTables, joinTable, setChipsHint } from './realtime/useTables.js';
+import { startTables, leaveTable, setInHand, useTables, joinTable, setChipsHint, sendTableChat } from './realtime/useTables.js';
 import './styles.css';
 import { usePlayerTimer } from './timer.js';
+import TableChat from './TableChat.jsx';
 
 const ASSETS = '/assets/';
 
@@ -380,7 +381,8 @@ function AuthScreen({ mode, setMode, onSuccess, onGuest }) {
         type: 'registered',
         name: data.player.username,
         id: data.player.id,
-        email: data.player.email
+        email: data.player.email,
+        token: data.token
       });
     } catch (error) {
       setMessage(
@@ -1160,8 +1162,8 @@ export default function App() {
  // Table the player is seated at, and chips carried between tables
  const [table, setTable] = useState(null);
  const [chips, setChips] = useState(1000);
-
- const { tables, mySeat, tableState: liveTable, offline } = useTables();
+ const [showTableChat, setShowTableChat] = useState(false);
+ const { tables, mySeat, tableState: liveTable, offline, chatMessages } = useTables();
 
  // Multiplayer tables are run by the server (one shared deck, dealer and turn order).
  // Solo Practice, and demo mode while the server is down, play the local game below.
@@ -1257,7 +1259,7 @@ function home() {
 
 function enterLobby(newPlayer) {
   setPlayer(newPlayer);
-  startTables(newPlayer.name);
+  startTables(newPlayer.name, newPlayer.token);
   setScreen('lobby');
 }
 
@@ -1451,7 +1453,8 @@ return (
               type: 'registered',
               name: loggedInPlayer.name,
               id: loggedInPlayer.id,
-              email: loggedInPlayer.email
+              email: loggedInPlayer.email,
+              token: loggedInPlayer.token
             });
           }}
           onGuest={() => enterLobby({ type: 'guest', name: 'Guest' })}
@@ -1469,104 +1472,113 @@ return (
         <CreateTable onCreated={result => sitAt(result.table)} onCancel={() => setScreen('lobby')} />
       ) : screen === 'game' && shared ? (
         sharedState ? (
+          <>
           <MultiplayerGame
             tableState={sharedState}
             mySeatIndex={mySeat?.seat}
             maxSeats={live?.maxSeats ?? 5}
             Card={Card}
-            toolbar={<TableBar table={table} onLeave={requestLeave} />}
+            toolbar={<TableBar table={table} onLeave={requestLeave} onChat={() => setShowTableChat(true)} canChat={Boolean(player?.token && !table.solo)} />}
             onChangeTable={requestLeave}
             onRoundSettled={saveSharedRound}
           />
-        ) : (
-          <>
-            <TableBar table={table} onLeave={requestLeave} />
-            <p className="table-loading" role="status">Taking your seat…</p>
-          </>
-        )
-      ) : screen === 'game' && game ? (
-        <Game
-          game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet}
-          timeLeft={timeLeft}
-          tableName={table?.name}
-          toolbar={table && <TableBar table={table} onLeave={requestLeave} />}
-          onChangeTable={table ? exitTable : undefined}
-        />
-      ) : screen === 'history' && player?.type === 'registered' ? (
-        <HistoryScreen
-          player={player}
-          onBack={home}
-        />  
-      ) : screen === 'friends' && player?.type === 'registered' ? (
-        <FriendsScreen
-          player={player}
-          onBack={home}
-        />
-
-      ) : screen === 'profile' && player?.type === 'registered' ? (
-        <ProfileEditor
-          player={player}
-          onSave={(updatedProfile) => {
-            setPlayer({
-              ...player,
-              name: updatedProfile.name,
-              profilePicture: updatedProfile.profilePicture
-            });
-            home();
-          }}
-          onCancel={home}
-        />
+          {showTableChat && (
+            <TableChat
+              player={player}
+              table={table}
+              onClose={() => setShowTableChat(false)}
+            />
+          )}
+        </> 
       ) : (
         <>
-          <h1>A good hand. Better company.</h1>
-          <div className="layout">
-            <section className="table welcome-table">
-              <div className="cards">
-                <Card card={lessons[0].cards[0]} />
-                <Card card={lessons[0].cards[1]} />
-              </div>
-            </section>
-
-            <aside className="panel">
-              <span className="eyebrow">WELCOME TO 21 CLUB</span>
-              <h2>Your next hand starts here.</h2>
-              <p>
-                Get closer to 21 than the dealer, without going over.
-                Start a fresh game or learn the rules at your own pace.
-              </p>
-
-              <button className="primary wide" onClick={begin}>
-                Start the game
-              </button>
-
-              <button
-                className="wide"
-                onClick={() => enterLobby({ type: 'guest', name: 'Guest' })}
-              >
-                Continue as Guest
-              </button>
-
-              <button
-                className="wide"
-                onClick={() => setScreen('tutorial')}
-              >
-                How to play
-              </button>
-            </aside>
-          </div>
+          <TableBar table={table} onLeave={requestLeave} />
+          <p className="table-loading" role="status">Taking your seat…</p>
         </>
-      )}
-      </motion.div>
-      </AnimatePresence>
-    </main>
+      )
+    ) : screen === 'game' && game ? (
+      <Game
+        game={game} setGame={setGame} player={player} historySaved={historySaved} bet={bet} setBet={setBet}
+        timeLeft={timeLeft}
+        tableName={table?.name}
+        toolbar={table && <TableBar table={table} onLeave={requestLeave} onChat={() => setShowTableChat(true)} />}
+        onChangeTable={table ? exitTable : undefined}
+      />
+    ) : screen === 'history' && player?.type === 'registered' ? (
+      <HistoryScreen
+        player={player}
+        onBack={home}
+      />  
+    ) : screen === 'friends' && player?.type === 'registered' ? (
+      <FriendsScreen
+        player={player}
+        onBack={home}
+      />
 
-    <AnimatePresence>
-      {confirmLeave && (
-        <LeaveConfirm stake={stake} onConfirm={exitTable} onCancel={() => setConfirmLeave(false)} />
-      )}
+    ) : screen === 'profile' && player?.type === 'registered' ? (
+      <ProfileEditor
+        player={player}
+        onSave={(updatedProfile) => {
+          setPlayer({
+            ...player,
+            name: updatedProfile.name,
+            profilePicture: updatedProfile.profilePicture
+          });
+          home();
+        }}
+        onCancel={home}
+      />
+    ) : (
+      <>
+        <h1>A good hand. Better company.</h1>
+        <div className="layout">
+          <section className="table welcome-table">
+            <div className="cards">
+              <Card card={lessons[0].cards[0]} />
+              <Card card={lessons[0].cards[1]} />
+            </div>
+          </section>
+
+          <aside className="panel">
+            <span className="eyebrow">WELCOME TO 21 CLUB</span>
+            <h2>Your next hand starts here.</h2>
+            <p>
+              Get closer to 21 than the dealer, without going over.
+              Start a fresh game or learn the rules at your own pace.
+            </p>
+
+            <button className="primary wide" onClick={begin}>
+              Start the game
+            </button>
+
+            <button
+              className="wide"
+              onClick={() => enterLobby({ type: 'guest', name: 'Guest' })}
+            >
+              Continue as Guest
+            </button>
+
+            <button
+              className="wide"
+              onClick={() => setScreen('tutorial')}
+            >
+              How to play
+            </button>
+          </aside>
+        </div>
+      </>
+    )}
+    </motion.div>
     </AnimatePresence>
-  </>
+  </main>
+
+  <AnimatePresence>
+    {confirmLeave && (
+      <LeaveConfirm stake={stake} onConfirm={exitTable} onCancel={() => setConfirmLeave(false)} />
+    )}
+  </AnimatePresence>
+</>
 );
 
 
-}
+  }

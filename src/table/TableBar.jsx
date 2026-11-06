@@ -5,7 +5,7 @@ import './table.css';
 
 // Bar above the table (Figma "Bet" 3:1135): back, name, live seat count, Leave.
 // Invite comes next iteration.
-export default function TableBar({ table, onLeave }) {
+export default function TableBar({ table, onLeave , onChat, canChat}) {
   const { tables } = useTables();
   const live = tables.find(t => t.id === table.id) ?? table;
 
@@ -18,6 +18,9 @@ export default function TableBar({ table, onLeave }) {
       </span>
       <div className="table-bar-actions">
         <SoundButton />
+        {canChat && (
+          <button onClick={onChat}>Chat</button>
+        )}
         <button onClick={onLeave}>Leave</button>
       </div>
     </div>
