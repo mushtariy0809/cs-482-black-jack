@@ -1,5 +1,5 @@
 import {useState, useEffect} from 'react';
-import { stand } from './blackjack';
+import { stand } from './blackjack.js';
 
 export function usePlayerTimer(game, setGame){
 const [timeLeft, setTimeLeft] = useState(30);

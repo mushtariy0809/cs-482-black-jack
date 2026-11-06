@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node --experimental-test-coverage --test src/blackjack.test.js src/tutorial/riggedDeck.test.js"
+    "test": "node --experimental-test-coverage --test backend/test/**/*.test.js src/tests/**/*.test.js src/blackjack.test.js src/tutorial/riggedDeck.test.js"
   },
   "dependencies": {
     "framer-motion": "^14.9.0",
