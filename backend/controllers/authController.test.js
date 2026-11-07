@@ -10,6 +10,8 @@ const {
   loginPlayer
 } = require('../controllers/authController');
 
+process.env.JWT_SECRET = 'test-secret-key';
+
 // Mock response object
 const createResponse = () => {
   const res = {
