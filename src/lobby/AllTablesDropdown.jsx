@@ -1,28 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
+import { useCloseOnOutside } from '../components/useDismiss.js';
 import { AnimatePresence, motion } from 'framer-motion';
 import { STATUS_LABELS, TableIcons, seatText } from './tableInfo.jsx';
 
 export default function AllTablesDropdown({ tables, activeId, onPick }) {
   const [open, setOpen] = useState(false);
-  const root = useRef(null);
-
   // Close on outside click or Escape
-  useEffect(() => {
-    if (!open) return undefined;
+  const root = useCloseOnOutside(open, () => setOpen(false));
 
-    function onPointer(event) {
-      if (!root.current?.contains(event.target)) setOpen(false);
-    }
-    function onKey(event) {
-      if (event.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('pointerdown', onPointer);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onPointer);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
 
   return (
     <div className="all-tables" ref={root}>

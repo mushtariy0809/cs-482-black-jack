@@ -1,21 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
+import { cancelOnBackdrop, useDialogFocus } from '../components/useDismiss.js';
 import { motion } from 'framer-motion';
 import './table.css';
 
 // Shown when leaving in the middle of a hand: the bet is lost (README penalty)
 export default function LeaveConfirm({ stake, onConfirm, onCancel }) {
-  const stay = useRef(null);
-  const cancel = useRef(onCancel);
-  cancel.current = onCancel;
-
-  useEffect(() => {
-    stay.current?.focus();
-    function onKey(event) {
-      if (event.key === 'Escape') cancel.current();
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  const stay = useDialogFocus(onCancel);
 
   return (
     <motion.div
@@ -23,9 +13,7 @@ export default function LeaveConfirm({ stake, onConfirm, onCancel }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onPointerDown={event => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
+      onPointerDown={cancelOnBackdrop(onCancel)}
     >
       <motion.div
         className="panel leave-dialog"

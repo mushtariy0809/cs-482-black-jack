@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
-import { scoreHand } from '../blackjack.js';
+import { isPair, scoreHand } from '../blackjack.js';
 import { placeBet, playAction } from '../realtime/useTables.js';
 import TableFx, { DealtCard, ScorePill, dealDelay } from './TableFx.jsx';
-import TableAds from './TableAds.jsx';
+import TableStage from './TableStage.jsx';
 import './multiplayer.css';
 
 // A multiplayer table. The server runs the round (deck, turns, dealer, payouts)
@@ -136,7 +135,6 @@ function Seat({ seat, index, isMe, isTurn, turnHand, seconds, Card }) {
 }
 
 export default function MultiplayerGame({ tableState, mySeatIndex, maxSeats = 5, toolbar, onChangeTable, Card, onRoundSettled }) {
-  const reduceMotion = useReducedMotion();
   const [pick, setPick] = useState(tableState.minBet);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -182,21 +180,13 @@ export default function MultiplayerGame({ tableState, mySeatIndex, maxSeats = 5,
 
   const timer = timerText(tableState.phase, seconds);
   const canDouble = activeHand && activeHand.cards.length === 2 && chips >= activeHand.bet;
-  const canSplit = activeHand && activeHand.cards.length === 2 && activeHand.cards[0].rank === activeHand.cards[1].rank && chips >= activeHand.bet;
+  const canSplit = activeHand && isPair(activeHand.cards) && chips >= activeHand.bet;
   const activeScore = activeHand ? scoreHand(activeHand.cards) : null;
 
   return (
     <>
       {toolbar}
-      <div className="game-layout">
-        <motion.div
-          className="game-stage"
-          initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.82 }}
-          transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-        >
-          <section className="table game-table mp-table" aria-label="Blackjack table">
+      <TableStage tableClassName="table game-table mp-table">
             <TableFx game={fxGame(tableState, mine)} bet={tableState.phase === 'betting' ? mine?.bet || pick : 0} />
 
             {/* Dealer (always a bot). The hole card flips when the dealer plays. */}
@@ -308,11 +298,7 @@ export default function MultiplayerGame({ tableState, mySeatIndex, maxSeats = 5,
               )}
               {error && <p className="mp-error" role="alert">{error}</p>}
             </div>
-          </section>
-        </motion.div>
-
-        <TableAds />
-      </div>
+      </TableStage>
     </>
   );
 }

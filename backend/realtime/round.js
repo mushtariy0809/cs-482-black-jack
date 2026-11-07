@@ -10,8 +10,8 @@ const crypto = require('crypto');
 //   dealer   short pause, then the bot dealer draws and every hand is settled
 //   settled  results are shown, then the table goes back to betting
 
-const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-const SUITS = ['spades', 'hearts', 'clubs', 'diamonds'];
+// Rules shared with the browser's solo game (see shared/rules.js)
+const { RANKS, SUITS, scoreHand, compareHands, dealerShouldHit, payoutFor: payoutForCards, isPair } = require('../../shared/rules.js');
 
 class RoundError extends Error {
   constructor(code, message) {
@@ -20,38 +20,9 @@ class RoundError extends Error {
   }
 }
 
-function cardValue(rank) {
-  return rank === 'A' ? 11 : ['J', 'Q', 'K'].includes(rank) ? 10 : Number(rank);
-}
-
-function scoreHand(cards) {
-  let total = 0;
-  let aces = 0;
-  for (const card of cards) {
-    total += cardValue(card.rank);
-    if (card.rank === 'A') aces++;
-  }
-  while (total > 21 && aces > 0) {
-    total -= 10;
-    aces--;
-  }
-  return { total, soft: aces > 0, bust: total > 21, blackjack: cards.length === 2 && total === 21 };
-}
-
-function compareHands(player, dealer) {
-  const p = scoreHand(player);
-  const d = scoreHand(dealer);
-  if (p.bust) return 'dealer';
-  if (d.bust) return 'player';
-  if (p.blackjack !== d.blackjack) return p.blackjack ? 'player' : 'dealer';
-  return p.total === d.total ? 'push' : p.total > d.total ? 'player' : 'dealer';
-}
-
 // What a hand pays back, bet included
 function payoutFor(hand, result) {
-  if (result === 'player') return scoreHand(hand.cards).blackjack ? hand.bet * 2.5 : hand.bet * 2;
-  if (result === 'push') return hand.bet;
-  return 0;
+  return payoutForCards(hand.bet, result, hand.cards);
 }
 
 // Card ids include the round number so React re-deals a card that shows up again next round
@@ -185,40 +156,45 @@ function finishHandIfDone(hand) {
   if (score.bust || score.total === 21) hand.done = true;
 }
 
+function hitHand(table, seat, hand) {
+  hand.cards.push(draw(table));
+  finishHandIfDone(hand);
+}
+
+function standHand(table, seat, hand) {
+  hand.done = true;
+}
+
+function doubleHand(table, seat, hand) {
+  if (hand.cards.length !== 2) throw new RoundError('cannot_double', 'You can only double on your first two cards.');
+  if (seat.chips < hand.bet) throw new RoundError('not_enough_chips', 'You do not have enough chips to double.');
+  seat.chips -= hand.bet;
+  hand.bet *= 2;
+  hand.doubled = true;
+  hand.cards.push(draw(table));
+  hand.done = true;
+}
+
+function splitPair(table, seat, hand) {
+  if (!isPair(hand.cards)) throw new RoundError('cannot_split', 'You can only split a pair.');
+  if (seat.chips < hand.bet) throw new RoundError('not_enough_chips', 'You do not have enough chips to split.');
+  seat.chips -= hand.bet;
+  const [first, second] = hand.cards;
+  const one = { cards: [first, draw(table)], bet: hand.bet, done: false, result: null, payout: 0 };
+  const two = { cards: [second, draw(table)], bet: hand.bet, done: false, result: null, payout: 0 };
+  finishHandIfDone(one);
+  finishHandIfDone(two);
+  seat.hands.splice(seat.hands.indexOf(hand), 1, one, two);
+}
+
+const ACTIONS = { hit: hitHand, stand: standHand, double: doubleHand, split: splitPair };
+
 // type: 'hit' | 'stand' | 'double' | 'split'
 function act(table, seat, type) {
   const hand = currentHand(table, seat);
-
-  if (type === 'hit') {
-    hand.cards.push(draw(table));
-    finishHandIfDone(hand);
-  } else if (type === 'stand') {
-    hand.done = true;
-  } else if (type === 'double') {
-    if (hand.cards.length !== 2) throw new RoundError('cannot_double', 'You can only double on your first two cards.');
-    if (seat.chips < hand.bet) throw new RoundError('not_enough_chips', 'You do not have enough chips to double.');
-    seat.chips -= hand.bet;
-    hand.bet *= 2;
-    hand.doubled = true;
-    hand.cards.push(draw(table));
-    hand.done = true;
-  } else if (type === 'split') {
-    const [first, second] = hand.cards;
-    if (hand.cards.length !== 2 || first.rank !== second.rank) {
-      throw new RoundError('cannot_split', 'You can only split a pair.');
-    }
-    if (seat.chips < hand.bet) throw new RoundError('not_enough_chips', 'You do not have enough chips to split.');
-    seat.chips -= hand.bet;
-    const index = seat.hands.indexOf(hand);
-    const one = { cards: [first, draw(table)], bet: hand.bet, done: false, result: null, payout: 0 };
-    const two = { cards: [second, draw(table)], bet: hand.bet, done: false, result: null, payout: 0 };
-    finishHandIfDone(one);
-    finishHandIfDone(two);
-    seat.hands.splice(index, 1, one, two);
-  } else {
-    throw new RoundError('invalid_action', 'Unknown action.');
-  }
-
+  const action = Object.hasOwn(ACTIONS, type) ? ACTIONS[type] : null;
+  if (!action) throw new RoundError('invalid_action', 'Unknown action.');
+  action(table, seat, hand);
   advance(table);
 }
 
@@ -242,7 +218,7 @@ function playDealerAndSettle(table) {
   const round = table.round;
   const live = playingSeats(table).some(seat => seat.hands.some(hand => !hand.forfeited && !scoreHand(hand.cards).bust));
   if (live) {
-    while (scoreHand(round.dealer).total < 17) round.dealer.push(draw(table));
+    while (dealerShouldHit(round.dealer)) round.dealer.push(draw(table));
   }
 
   for (const seat of playingSeats(table)) {

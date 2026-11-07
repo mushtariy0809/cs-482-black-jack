@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
+import { cancelOnBackdrop, useDialogFocus } from '../components/useDismiss.js';
 import { motion } from 'framer-motion';
 import { LockIcon } from './tableInfo.jsx';
 
@@ -7,19 +8,8 @@ export default function PasswordPrompt({ table, onSubmit, onCancel }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const input = useRef(null);
-  const cancel = useRef(onCancel);
-  cancel.current = onCancel;
-
-  // Runs once: live table updates re-render the lobby and must not steal focus
-  useEffect(() => {
-    input.current?.focus();
-    function onKey(event) {
-      if (event.key === 'Escape') cancel.current();
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  // Focuses once: live table updates re-render the lobby and must not steal focus
+  const input = useDialogFocus(onCancel);
 
   async function submit(event) {
     event.preventDefault();
@@ -42,9 +32,7 @@ export default function PasswordPrompt({ table, onSubmit, onCancel }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onPointerDown={event => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
+      onPointerDown={cancelOnBackdrop(onCancel)}
     >
       <motion.form
         className="panel password-prompt"

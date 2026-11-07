@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
+import { useCloseOnOutside } from '../components/useDismiss.js';
 import { AnimatePresence, motion } from 'framer-motion';
 import { updateSettings, useSoundSettings } from './SoundManager.js';
 import './sound.css';
@@ -27,23 +28,9 @@ function SpeakerIcon({ muted }) {
 export default function SoundButton({ compact = false }) {
   const settings = useSoundSettings();
   const [open, setOpen] = useState(false);
-  const root = useRef(null);
+  // Close on outside click or Escape
+  const root = useCloseOnOutside(open, () => setOpen(false));
 
-  useEffect(() => {
-    if (!open) return undefined;
-    function onPointer(event) {
-      if (!root.current?.contains(event.target)) setOpen(false);
-    }
-    function onKey(event) {
-      if (event.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('pointerdown', onPointer);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onPointer);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
 
   return (
     <div className={'sound-control' + (compact ? ' is-compact' : '')} ref={root}>

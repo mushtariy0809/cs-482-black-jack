@@ -1,20 +1,12 @@
+import { RANKS, SUITS, cardValue, scoreHand, dealerShouldHit, compareHands, payoutFor, isPair } from '../shared/rules.js';
+
+// The rules themselves live in shared/rules.js so the server's multiplayer round uses the exact same ones
+export { cardValue, scoreHand, dealerShouldHit, compareHands, isPair };
+
 export const RULES = Object.freeze({ dealerStandsOnSoft17: true });
-const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
-
-export function cardValue(rank) {
-  if (!ranks.includes(rank)) throw new Error(`Unknown card rank: ${rank}`);
-  return rank === 'A' ? 11 : ['J','Q','K'].includes(rank) ? 10 : Number(rank);
-}
-
-export function scoreHand(cards) {
-  let total = 0, aces = 0;
-  for (const card of cards) { total += cardValue(card.rank); if (card.rank === 'A') aces++; }
-  while (total > 21 && aces > 0) { total -= 10; aces--; }
-  return { total, soft: aces > 0, bust: total > 21, blackjack: cards.length === 2 && total === 21 };
-}
 
 export function createDeck() {
-  return ['spades','hearts','clubs','diamonds'].flatMap(suit => ranks.map(rank => ({ rank, suit, id: `${rank}-${suit}` })));
+  return SUITS.flatMap(suit => RANKS.map(rank => ({ rank, suit, id: `${rank}-${suit}` })));
 }
 
 export function shuffleDeck(deck, random = Math.random) {
@@ -23,26 +15,9 @@ export function shuffleDeck(deck, random = Math.random) {
   return copy;
 }
 
-export function dealerShouldHit(cards) { return scoreHand(cards).total < 17; }
-
-export function compareHands(player, dealer) {
-  const p = scoreHand(player), d = scoreHand(dealer);
-  if (p.bust) return 'dealer';
-  if (d.bust) return 'player';
-  if (p.blackjack !== d.blackjack) return p.blackjack ? 'player' : 'dealer';
-  return p.total === d.total ? 'push' : p.total > d.total ? 'player' : 'dealer';
-}
-
+// Balance after a hand settles (the bet was already taken when it was dealt)
 export function resolvePayout(money, bet, result, player) {
-  const isBlackjack = scoreHand(player).blackjack;
-  if (result === 'player') {
-    const winnings = isBlackjack ? bet * 2.5 : bet * 2;
-    return money + winnings;
-  } 
-  else if (result === 'push') {
-    return money + bet;
-  }
-  return money;
+  return money + payoutFor(bet, result, player);
 }
 
 export function startGame(initialMoney = 1000) { 
@@ -164,10 +139,6 @@ export function doubleDown(game) {
   if (currentHand.cards.length !== 2 || game.money < currentHand.bet) return game;
   if (!game.deck.length) throw new Error('Deck exhausted.');
 
-
-  if (game.player.length !== 2) return game;
-  if (game.money < game.bet) return game;
-  if (!game.deck.length) throw new Error('Deck exhausted.');
 
   const deck = [...game.deck];
   const hands = [...game.hands];

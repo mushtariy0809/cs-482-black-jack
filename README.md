@@ -8,6 +8,31 @@
 
 A multiplayer blackjack web application where users can play with friends or bots using virtual money. The platform will feature a simple, green-themed interface and advertisements in the lobby and game tables.
 
+## Running the Project
+
+Requires Node.js 20.19+ or 22.12+. Run everything from this folder; there is no need to `cd backend`.
+
+```sh
+npm install          # installs the frontend and (automatically) the backend
+npm run dev          # backend on :5000 + frontend on :5173, in one terminal (Ctrl+C stops both)
+npm run dev:memory   # same, but with a throwaway in-memory MongoDB (no MONGO_URI needed)
+npm test             # game-logic, backend and React component tests
+npm run build        # production build of the frontend
+```
+
+`backend/.env` needs `MONGO_URI` (not needed for `dev:memory`) and `JWT_SECRET` (used to sign login tokens).
+
+Single parts: `npm run dev:frontend`, `npm run dev:backend`, `npm run test:logic`, `npm run test:backend`, `npm run test:ui`.
+
+## Code Layout
+
+- `shared/rules.js`: blackjack rules (card values, scoring, dealer, payouts) used by both the browser and the server
+- `src/App.jsx`: app state and which screen is shown; screens live in `src/screens/`, the header in `src/layout/`
+- `src/blackjack.js`: solo/practice game played in the browser
+- `backend/realtime/`: multiplayer tables over Socket.IO (`round.js` runs the shared round)
+- `backend/controllers/`, `backend/routes/`: REST API for accounts, friends, messages and history
+- Tests: `*.test.js` (Node test runner) and `src/**/*.test.jsx` (Vitest + Testing Library)
+
 ## Planned Features
 
 - **Accounts and guest access:** Register, log in, or play as a guest. New accounts receive a virtual-money bonus.
