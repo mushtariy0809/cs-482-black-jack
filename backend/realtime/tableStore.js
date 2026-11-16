@@ -130,6 +130,26 @@ class TableStore extends EventEmitter {
     return table ? publicView(table) : null;
   }
 
+  closeEmptyTable(tableId) {
+    const table = this.tables.get(tableId);
+    if (!table) {
+      throw new TableError('not_found', 'That table no longer exists.');
+    }
+    if (table.isSystem) {
+      throw new TableError('system_table', 'System tables cannot be closed.');
+    }
+    if (table.seats.length > 0) {
+      throw new TableError('table_occupied', 'Only empty tables can be closed.');
+    }
+
+    this._clearRoundTimer(table);
+    this.tables.delete(tableId);
+    Promise.resolve(this.persist.remove?.(tableId))
+      .catch(error => console.error('Table remove failed:', error.message));
+    this.emit('removed', tableId);
+    return { id: tableId };
+  }
+
   // The shared round as players at the table see it (null for solo tables)
   roundState(tableId) {
     const table = this.tables.get(tableId);

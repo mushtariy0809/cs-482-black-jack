@@ -35,6 +35,7 @@ export default function ProfileMenu({ player, onProfile, onFriends, onLogOut }) 
             <ProfilePicture player={player} imageClass="dropdown-profile-picture" placeholder="div" placeholderClass="dropdown-profile-placeholder" />
             <h3>{player.name}</h3>
             <p>{player.email}</p>
+            {player.role === 'admin' && <p>Administrator</p>}
           </div>
 
           <div className="profile-dropdown-divider"></div>

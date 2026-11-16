@@ -45,6 +45,18 @@ describe('AppHeader', () => {
     expect(onLogOut).toHaveBeenCalled();
   });
 
+  it('identifies an admin account in the profile menu', async () => {
+    const { user } = renderHeader({
+      type: 'registered',
+      role: 'admin',
+      name: 'Admin',
+      email: 'admin@example.com'
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Open profile menu' }));
+    expect(screen.getByText('Administrator')).toBeInTheDocument();
+  });
+
   it('the logo and Play both go home', async () => {
     const { onHome, user } = renderHeader(null, 'tutorial');
     await user.click(screen.getByText('21 CLUB'));

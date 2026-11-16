@@ -1,4 +1,22 @@
 import React, { useEffect, useState } from 'react';
+import './history.css';
+
+const RESULT_LABELS = {
+  win: 'Win',
+  loss: 'Loss',
+  push: 'Tie'
+};
+
+function formatDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? 'Date unavailable'
+    : date.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+}
 
 // Game history for a registered player
 export default function HistoryScreen({ player, onBack }) {
@@ -19,41 +37,78 @@ export default function HistoryScreen({ player, onBack }) {
       .finally(() => setLoading(false));
   }, [player.id]);
 
-  return (
-    <div className="layout">
-      <section className="panel">
+  const wins = history.filter(item => item.result === 'win').length;
+  const losses = history.filter(item => item.result === 'loss').length;
+  const ties = history.filter(item => item.result === 'push').length;
 
-        <h2>Game History</h2>
-        <p>Past games for {player.name}</p>
+  return (
+    <div className="history-page">
+      <div className="history-heading">
+        <div>
+          <span className="history-eyebrow">YOUR TABLE RECORD</span>
+          <h1>Game history</h1>
+          <p>Every hand tells a story, {player.name}.</p>
+        </div>
+        <span className="history-total">{history.length} {history.length === 1 ? 'hand' : 'hands'}</span>
+      </div>
+
+      <section className="history-summary" aria-label="Game results summary">
+        <article className="history-stat">
+          <span>Wins</span>
+          <strong>{wins}</strong>
+        </article>
+        <article className="history-stat">
+          <span>Losses</span>
+          <strong>{losses}</strong>
+        </article>
+        <article className="history-stat">
+          <span>Ties</span>
+          <strong>{ties}</strong>
+        </article>
+      </section>
+
+      <section className="history-section" aria-labelledby="history-recent-title">
+        <div className="history-section-heading">
+          <h2 id="history-recent-title">Recent hands</h2>
+          {!loading && !error && history.length > 0 && (
+            <span>Newest first</span>
+          )}
+        </div>
 
         {loading ? (
-          <p>Loading your games...</p>
+          <div className="history-message" role="status">Loading your games…</div>
         ) : error ? (
-          <p>{error}</p>
+          <div className="history-message history-error" role="alert">{error}</div>
         ) : history.length === 0 ? (
-          <p>No completed games yet.</p>
-        ) : (
-          <div className="rule-list">
-            {history.map(item => (
-              <div key={item._id}>
-                <p>
-                  <strong>
-                    {item.result === 'win'
-                      ? 'Win'
-                      : item.result === 'loss'
-                        ? 'Loss'
-                        : 'Tie'}
-                  </strong>
-                  <span>
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </span>
-                </p>
-                <p>
-                  Your score: {item.playerScore} · Dealer score: {item.dealerScore}
-                </p>
-              </div>
-            ))}
+          <div className="history-message history-empty">
+            <span className="history-empty-mark" aria-hidden="true">♠</span>
+            <h3>No hands played yet</h3>
+            <p>Your completed games will show up here.</p>
           </div>
+        ) : (
+          <ol className="history-list">
+            {history.map((item, index) => (
+              <li className="history-item" key={item._id}>
+                <span className={`history-result-icon history-result-${item.result}`} aria-hidden="true">
+                  {item.result === 'win' ? '♠' : item.result === 'loss' ? '♣' : '♦'}
+                </span>
+                <div className="history-result-copy">
+                  <strong className={`history-result-label history-result-${item.result}`}>
+                    {RESULT_LABELS[item.result] || 'Game'}
+                  </strong>
+                  <span>Hand {history.length - index}</span>
+                </div>
+                <div className="history-scores" aria-label={`You ${item.playerScore}, dealer ${item.dealerScore}`}>
+                  <div><span>You</span><strong>{item.playerScore}</strong></div>
+                  <span className="history-versus">vs</span>
+                  <div><span>Dealer</span><strong>{item.dealerScore}</strong></div>
+                </div>
+                <time className="history-date" dateTime={item.createdAt}>
+                  {formatDate(item.createdAt)}
+                </time>
+              </li>
+            ))}
+          </ol>
         )}
       </section>
     </div>

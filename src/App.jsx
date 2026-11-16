@@ -16,9 +16,10 @@ import HistoryScreen from './screens/HistoryScreen.jsx';
 import ProfileEditor from './screens/ProfileEditor.jsx';
 import SoloGame from './screens/SoloGame.jsx';
 import WelcomeScreen from './screens/WelcomeScreen.jsx';
+import AdminDashboard from './admin/AdminDashboard.jsx';
 import TableChat from './TableChat.jsx';
 import { installUiSounds, preload, setMusic } from './sound/SoundManager.js';
-import { startTables, leaveTable, joinTable, setChipsHint } from './realtime/useTables.js';
+import { startTables, stopTables, leaveTable, joinTable, setChipsHint } from './realtime/useTables.js';
 import { saveHandToHistory } from './history/saveHistory.js';
 import { usePlayerTimer } from './timer.js';
 import './styles.css';
@@ -113,6 +114,13 @@ export default function App() {
 
   function enterLobby(newPlayer) {
     setPlayer(newPlayer);
+    if (newPlayer.role === 'admin') {
+      stopTables();
+      setTable(null);
+      setGame(null);
+      setScreen('admin');
+      return;
+    }
     startTables(newPlayer.name, newPlayer.token);
     setScreen('lobby');
   }
@@ -160,6 +168,7 @@ export default function App() {
 
   function logOut() {
     if (table) leaveTable();
+    stopTables();
     setTable(null);
     setPlayer(null);
     setGame(null);
@@ -217,7 +226,7 @@ export default function App() {
           <AuthScreen
             mode={authMode}
             setMode={setAuthMode}
-            onSuccess={({ name, id, email, token }) => enterLobby({ type: 'registered', name, id, email, token })}
+            onSuccess={({ name, id, email, token, role }) => enterLobby({ type: 'registered', name, id, email, token, role })}
             onGuest={() => enterLobby(GUEST)}
           />
         );
@@ -248,19 +257,25 @@ export default function App() {
 
   return (
     <>
-      <AppHeader screen={screen} player={player} chips={chips} onHome={home} onNavigate={setScreen} onLogOut={logOut} />
+      {screen === 'admin' && player?.role === 'admin' ? (
+        <AdminDashboard player={player} onLogout={logOut} />
+      ) : (
+        <>
+          <AppHeader screen={screen} player={player} chips={chips} onHome={home} onNavigate={setScreen} onLogOut={logOut} />
 
-      <main ref={main} tabIndex="-1">
-        <AnimatePresence mode="wait">
-          <motion.div key={screen} {...screenMotion}>
-            {renderScreen()}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+          <main ref={main} tabIndex="-1">
+            <AnimatePresence mode="wait">
+              <motion.div key={screen} {...screenMotion}>
+                {renderScreen()}
+              </motion.div>
+            </AnimatePresence>
+          </main>
 
-      <AnimatePresence>
-        {confirmLeave && <LeaveConfirm stake={stake} onConfirm={exitTable} onCancel={() => setConfirmLeave(false)} />}
-      </AnimatePresence>
+          <AnimatePresence>
+            {confirmLeave && <LeaveConfirm stake={stake} onConfirm={exitTable} onCancel={() => setConfirmLeave(false)} />}
+          </AnimatePresence>
+        </>
+      )}
     </>
   );
 }
