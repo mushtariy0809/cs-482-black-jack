@@ -1,10 +1,22 @@
 
 const GameHistory = require('../models/GameHistory');
+const { RANKS, SUITS } = require('../../shared/rules.js');
+
+// A blackjack hand never needs more than 11 cards; anything odd is dropped
+const MAX_CARDS = 12;
+
+function cleanCards(cards) {
+  if (!Array.isArray(cards)) return [];
+  return cards
+    .filter(card => card && RANKS.includes(card.rank) && SUITS.includes(card.suit))
+    .slice(0, MAX_CARDS)
+    .map(card => ({ rank: card.rank, suit: card.suit }));
+}
 
 // Save a completed game
 const saveGameHistory = async (req, res) => {
   try {
-    const { playerId, result, playerScore, dealerScore } = req.body;
+    const { playerId, result, playerScore, dealerScore, tableName, playerCards, dealerCards } = req.body;
 
     if (!playerId || !result || playerScore == null || dealerScore == null) {
       return res.status(400).json({
@@ -22,7 +34,11 @@ const saveGameHistory = async (req, res) => {
       player: playerId,
       result,
       playerScore,
-      dealerScore
+      dealerScore,
+      // Optional: the table and the cards, for the History screen
+      tableName: typeof tableName === 'string' ? tableName.trim().slice(0, 40) : '',
+      playerCards: cleanCards(playerCards),
+      dealerCards: cleanCards(dealerCards)
     });
 
     res.status(201).json({

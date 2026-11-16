@@ -232,7 +232,7 @@ export default function MultiplayerGame({ tableState, mySeatIndex, maxSeats = 5,
             )}
 
             {/* Every seat at the table, in turn order */}
-            <div className="mp-seats">
+            <div className="mp-seats" style={{ '--seat-count': maxSeats }}>
               {seatsByIndex.map((seat, i) => (
                 <Seat
                   key={i}

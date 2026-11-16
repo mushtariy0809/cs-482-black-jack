@@ -6,7 +6,12 @@ import App from './App.jsx';
 
 // No live server in tests: the lobby connection is a stub
 vi.mock('./realtime/useTables.js', () => ({
-  useTables: () => ({ tables: [], mySeat: null, tableState: null, offline: true, connection: 'connected', chatMessages: [] }),
+  useTables: () => ({ tables: [], mySeat: null, tableState: null, offline: true, connection: 'connected', chatMessages: [], invites: [] }),
+  getAdStatus: vi.fn(async () => ({ ok: true, status: { reward: 100, perDay: 5, watchedToday: 0, remaining: 5, nextAt: null } })),
+  startAd: vi.fn(),
+  completeAd: vi.fn(),
+  abandonAd: vi.fn(),
+  dismissInvite: vi.fn(),
   startTables: vi.fn(),
   leaveTable: vi.fn(),
   joinTable: vi.fn(async () => ({ ok: true })),

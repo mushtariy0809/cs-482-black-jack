@@ -1,0 +1,305 @@
+/* Invite friends panel at the table (U1) */
+
+.panel.invite-panel {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  gap: 22px;
+  padding: 28px;
+  background: linear-gradient(140deg, #12372c, #061710);
+  border: 1px solid #4d6043;
+  box-shadow: 0 24px 35px #0006;
+}
+
+.invite-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.invite-head .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.invite-head h2 {
+  margin: 0 0 4px;
+  font: 600 28px var(--font-display);
+  overflow-wrap: anywhere;
+}
+
+.invite-close {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.invite-muted {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.invite-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.invite-section h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--cream);
+}
+
+.invite-link-row {
+  display: flex;
+  gap: 8px;
+}
+
+.invite-link-row input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 12px;
+  font: 14px Inter, Arial, sans-serif;
+  color: var(--mint-soft);
+  background: #03100c;
+  border: 1px solid #4d6043;
+  border-radius: 10px;
+}
+
+.invite-copy {
+  flex: none;
+  min-width: 112px;
+  min-height: 46px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+.invite-code-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.invite-code {
+  font: 700 24px 'Cinzel', Georgia, serif;
+  letter-spacing: 6px;
+  color: var(--gold);
+}
+
+.invite-code-row .invite-copy {
+  margin-left: auto;
+}
+
+.invite-share {
+  min-height: 46px;
+}
+
+.invite-pin {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--cream);
+  border: 1px solid var(--gold-line);
+  border-radius: 10px;
+  background: rgba(242, 211, 136, 0.08);
+}
+
+.invite-pin-value {
+  letter-spacing: 3px;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.invite-pin-toggle {
+  min-height: 0;
+  padding: 2px 10px;
+  font-size: 12px;
+  border-radius: 20px;
+}
+
+.invite-friends {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invite-friend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 10px;
+  border: 1px solid var(--line-green);
+  border-radius: 12px;
+  background: rgba(3, 16, 12, 0.5);
+}
+
+.invite-friend-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--mint);
+}
+
+.invite-friend-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.invite-friend-name .form-error,
+.invite-friend-sent {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.invite-friend-sent {
+  color: var(--mint);
+}
+
+.invite-friend button {
+  flex: none;
+  min-height: 40px;
+  padding: 8px 18px;
+  font-size: 14px;
+}
+
+.invite-guest {
+  padding: 12px 14px;
+  border: 1px dashed var(--line-green);
+  border-radius: 10px;
+}
+
+/* Toasts: friend invites and "out of chips", bottom-left */
+
+.toast-stack {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(400px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--gold-line);
+  border-radius: 14px;
+  background: linear-gradient(140deg, #143c30, #071a14);
+  box-shadow: 0 16px 30px #0008;
+  pointer-events: auto;
+}
+
+.toast-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 18px;
+  color: var(--ink);
+  background: var(--gold);
+}
+
+.toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.toast-body strong {
+  font-size: 15px;
+  color: var(--cream);
+}
+
+.toast-body .table-icon {
+  vertical-align: -2px;
+}
+
+.toast-note {
+  font-size: 12px;
+  color: var(--gold);
+}
+
+.toast-actions {
+  grid-column: 2;
+  display: flex;
+  gap: 8px;
+}
+
+.toast-actions button {
+  min-height: 38px;
+  padding: 6px 16px;
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .toast-stack {
+    left: 16px;
+    bottom: 16px;
+  }
+
+  .panel.invite-panel {
+    padding: 20px;
+  }
+
+  .invite-link-row {
+    flex-direction: column;
+  }
+
+  .invite-code-row .invite-copy {
+    margin-left: 0;
+  }
+}
+
+/* Short notices in the toast stack (e.g. "Next ad in 12s") */
+.toast.toast-notice {
+  display: block;
+  margin: 0;
+  font-size: 14px;
+  color: var(--cream);
+}
+
+/* Shown above the welcome/login screen after opening an invite link */
+.invite-banner {
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  font-size: 15px;
+  color: var(--ink);
+  border-radius: 12px;
+  background: linear-gradient(#f9e2a6, #d9b061);
+}

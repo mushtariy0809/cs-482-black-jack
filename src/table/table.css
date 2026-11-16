@@ -475,3 +475,23 @@
     left: 8%;
   }
 }
+
+/* Invite friends (U1) and private table lock (T1) in the table bar */
+.table-bar h1 .table-icon {
+  width: 20px;
+  height: 20px;
+  vertical-align: -1px;
+  color: var(--gold);
+}
+
+.table-bar-actions .table-bar-invite {
+  color: var(--gold);
+  border-color: var(--gold-line);
+}
+
+/* Up to four buttons now (Sound, Invite, Chat, Leave): tighter on phones */
+@media (max-width: 760px) {
+  .table-bar-actions button {
+    padding: 10px 12px;
+  }
+}

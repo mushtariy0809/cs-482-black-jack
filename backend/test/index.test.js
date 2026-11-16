@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const Table = require('../models/Table.js');
+const AdView = require('../models/AdView.js');
 const { startRealtime } = require('../realtime/index.js');
 
 /**
@@ -25,6 +26,9 @@ test.beforeEach(() => {
   });
   Table.findByIdAndUpdate = (id, update, options) => Promise.resolve({ _id: id, ...update });
   Table.deleteOne = (filter) => Promise.resolve({ acknowledged: true, deletedCount: 1 });
+  // Video ad views (U21) are loaded at startup too
+  AdView.find = () => ({ lean: () => Promise.resolve([]) });
+  AdView.findByIdAndUpdate = (id, update) => Promise.resolve({ _id: id, ...update });
 });
 
 test('startRealtime initializes store, loads tables, and sets up sweep interval', async (t) => {

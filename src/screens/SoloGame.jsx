@@ -17,7 +17,7 @@ export function scoreSuffix(cards) {
 }
 
 // Saves each finished solo round once for registered players
-function useSaveSoloHistory(game, player, historySaved) {
+function useSaveSoloHistory(game, player, historySaved, tableName) {
   useEffect(() => {
     if (game.phase !== 'finished') return;
     saveHandToHistory({
@@ -26,6 +26,7 @@ function useSaveSoloHistory(game, player, historySaved) {
       result: game.result,
       playerCards: game.player,
       dealerCards: game.dealer,
+      tableName,
       savedKeys: historySaved.current
     });
   }, [game, player]);
@@ -221,7 +222,7 @@ function GameControls(props) {
 // Solo / practice table played in the browser (src/blackjack.js).
 // Table with a controls bar along the bottom (see TableStage for the layout).
 export default function SoloGame({ game, setGame, player, historySaved, bet, setBet, timeLeft, tableName = 'The Green Room', toolbar, onChangeTable }) {
-  useSaveSoloHistory(game, player, historySaved);
+  useSaveSoloHistory(game, player, historySaved, tableName);
   const finished = game.phase === 'finished';
 
   return (

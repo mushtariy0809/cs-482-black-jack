@@ -13,6 +13,9 @@ vi.mock('../sound/SoundManager.js', () => ({
   useSoundSettings: () => ({ muted: true, volume: 0.5 })
 }));
 
+// jsdom has no layout: framer-motion's height animations call scrollTo, which jsdom only logs as "not implemented"
+window.scrollTo = () => {};
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

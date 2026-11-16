@@ -51,10 +51,11 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* 2–7 seats, chosen when the table was created */
+  grid-template-columns: repeat(var(--seat-count, 5), minmax(0, 1fr));
   align-items: end;
   gap: 10px;
-  width: min(900px, 100%);
+  width: min(1000px, 100%);
   margin-top: auto;
 }
 

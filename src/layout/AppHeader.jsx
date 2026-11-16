@@ -4,8 +4,9 @@ import ConnectionPill from '../realtime/ConnectionPill.jsx';
 import SoundButton from '../sound/SoundButton.jsx';
 import ProfileMenu from './ProfileMenu.jsx';
 
-// Logo, main navigation, profile menu, connection/sound controls and the chip count
-export default function AppHeader({ screen, player, chips, onHome, onNavigate, onLogOut }) {
+// Logo, main navigation, profile menu, connection/sound controls and the chip count.
+// adButton: the "Watch ad for chips" button (U21), shown next to the chip count.
+export default function AppHeader({ screen, player, chips, onHome, onNavigate, onLogOut, adButton = null }) {
   const registered = player?.type === 'registered';
 
   return (
@@ -49,6 +50,7 @@ export default function AppHeader({ screen, player, chips, onHome, onNavigate, o
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
         <ConnectionPill />
         <SoundButton compact />
+        {player && adButton}
         {player ? (
           <span className="chips-counter">{chips.toLocaleString()} chips</span>
         ) : (

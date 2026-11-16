@@ -116,7 +116,16 @@ describe('SoloGame', () => {
     renderGame(finished, { player: { type: 'registered', id: 'p1', name: 'Mush' } });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ playerId: 'p1', result: 'win', playerScore: 19, dealerScore: 16 });
+    // The table and cards are saved too, for the History screen (card ids are left out)
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      playerId: 'p1',
+      result: 'win',
+      playerScore: 19,
+      dealerScore: 16,
+      tableName: 'The Green Room',
+      playerCards: [{ rank: '10', suit: 'clubs' }, { rank: '9', suit: 'clubs' }],
+      dealerCards: [{ rank: '9', suit: 'clubs' }, { rank: '7', suit: 'clubs' }]
+    });
   });
 
   it('never saves history for guests', () => {

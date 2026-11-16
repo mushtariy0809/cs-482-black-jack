@@ -64,11 +64,23 @@ const tableSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Player seats (the bot dealer is extra). Creators pick 2–7.
   maxSeats: {
     type: Number,
-    default: 5
+    default: 5,
+    min: 1,
+    max: 7
   },
   seats: [seatSchema],
+  // Private tables: client ids that may see the table, and invited friends' account ids
+  allowedClients: {
+    type: [String],
+    default: []
+  },
+  invitedPlayers: {
+    type: [String],
+    default: []
+  },
   minBet: {
     type: Number,
     default: 10
@@ -83,6 +95,11 @@ const tableSchema = new mongoose.Schema({
     default: 'waiting'
   },
   createdBy: {
+    type: String,
+    default: null
+  },
+  // Account of a logged-in creator, so "My tables" works on every device
+  createdByPlayer: {
     type: String,
     default: null
   },

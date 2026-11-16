@@ -7,10 +7,15 @@ export function historyResult(result) {
   return 'push';
 }
 
+// Just rank and suit: the History screen draws the cards from these
+function plainCards(cards) {
+  return cards.filter(card => card.rank && card.suit).map(card => ({ rank: card.rank, suit: card.suit }));
+}
+
 // Saves one finished hand for a registered player, once per round key.
 // Used by both the solo game and shared multiplayer tables.
 // savedKeys is a Set (kept in a ref) so a re-render never saves the same round twice.
-export function saveHandToHistory({ player, key, result, playerCards, dealerCards, savedKeys }) {
+export function saveHandToHistory({ player, key, result, playerCards, dealerCards, tableName = '', savedKeys }) {
   if (player?.type !== 'registered' || !player?.id || savedKeys.has(key)) return null;
   savedKeys.add(key);
 
@@ -21,7 +26,10 @@ export function saveHandToHistory({ player, key, result, playerCards, dealerCard
       playerId: player.id,
       result: historyResult(result),
       playerScore: scoreHand(playerCards).total,
-      dealerScore: scoreHand(dealerCards).total
+      dealerScore: scoreHand(dealerCards).total,
+      tableName,
+      playerCards: plainCards(playerCards),
+      dealerCards: plainCards(dealerCards)
     })
   })
     .then(response => {

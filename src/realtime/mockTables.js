@@ -1,8 +1,11 @@
+import { AD_REWARD, ADS_PER_DAY, VIDEO_ADS } from '../../shared/ads.js';
+
 // Demo tables shown when the socket server can't be reached,
 // so the lobby still works while the backend is down.
 function table(fields) {
   return {
     visibility: 'public',
+    hasPin: false,
     mode: 'people',
     solo: false,
     isSystem: false,
@@ -53,11 +56,41 @@ export function mockAction(event, payload, tables) {
       id: 'demo-' + Date.now(),
       name,
       visibility: payload.visibility ?? 'public',
-      mode: payload.mode ?? 'people',
+      hasPin: Boolean(payload.password),
+      maxSeats: payload.maxSeats ?? 5,
       players: 1
     });
     return { ok: true, table: created, inviteCode: 'DEMO00', seat: 0 };
   }
 
-  return { ok: true };
+  return mockExtras(event, payload) ?? { ok: true };
+}
+
+// Demo ads: no limits, nothing saved
+let demoAdIndex = 0;
+const demoAdStatus = { reward: AD_REWARD, perDay: ADS_PER_DAY, watchedToday: 0, remaining: ADS_PER_DAY, nextAt: null };
+
+function mockExtras(event, payload) {
+  switch (event) {
+    case 'table:peek':
+      return { ok: false, code: 'offline', message: 'Invite codes need the server. Try again once you are back online.' };
+    case 'table:invite-info':
+      return { ok: true, tableId: null, tableName: '', inviteCode: 'DEMO00', visibility: 'public', hasPin: false };
+    case 'table:invite':
+      return { ok: false, code: 'offline', message: 'Invites need the server. Try again once you are back online.' };
+    case 'table:mine':
+      return { ok: true, tables: [] };
+    case 'table:delete':
+      return { ok: false, code: 'offline', message: 'Deleting tables needs the server. Try again once you are back online.' };
+    case 'ad:status':
+      return { ok: true, status: demoAdStatus };
+    case 'ad:start': {
+      const ad = VIDEO_ADS.find(a => a.id === payload.adId) ?? VIDEO_ADS[demoAdIndex++ % VIDEO_ADS.length];
+      return { ok: true, viewId: `demo-${Date.now()}`, adId: ad.id, durationMs: ad.durationMs, status: demoAdStatus };
+    }
+    case 'ad:complete':
+      return { ok: true, reward: AD_REWARD, status: demoAdStatus, seatChips: null };
+    default:
+      return null;
+  }
 }

@@ -4,9 +4,13 @@ const EventEmitter = require('events');
 const bcrypt = require('bcryptjs');
 const round = require('./round');
 
-// 5 player seats + the bot dealer = the six-person table from the README.
-// The dealer is always a bot: players can never deal.
-const MAX_SEATS = 5;
+// The dealer is always a bot: players can never deal, and bots never take a player seat.
+// Table creators pick 2–7 player seats; the system tables keep 5 (+ the dealer).
+const MIN_SEATS = 2;
+const MAX_SEATS = 7;
+const DEFAULT_SEATS = 5;
+// Private tables can have an optional PIN
+const PIN_PATTERN = /^\d{4,6}$/;
 // How long a seat is held after a player leaves
 const SEAT_HOLD_MS = 10 * 1000;
 // Empty player-made tables are removed after this long
@@ -56,13 +60,42 @@ function statusOf(table) {
   return 'waiting';
 }
 
-// What every lobby is allowed to see. Never includes passwords or client ids,
-// and private invite codes are only given to the table creator.
+// Private tables are hidden from the lobby. Only people who were let in (the creator,
+// invited friends, anyone who joined with the code) and the players seated there see them.
+// viewer: { clientId, playerId? }
+function canSee(table, viewer) {
+  if (table.visibility === 'public') return true;
+  if (!viewer) return false;
+  return isCreator(table, viewer)
+    || table.allowedClients.includes(viewer.clientId)
+    || Boolean(viewer.playerId && table.invitedPlayers.includes(viewer.playerId))
+    || table.seats.some(seat => seat.clientId === viewer.clientId);
+}
+
+// The creator: same browser, or the same account on any device
+function isCreator(table, viewer) {
+  if (!viewer || table.isSystem) return false;
+  return table.createdBy === viewer.clientId
+    || Boolean(viewer.playerId && table.createdByPlayer === viewer.playerId);
+}
+
+// Who gets live updates about a table: null means every lobby
+function audienceOf(table) {
+  if (table.visibility === 'public') return null;
+  return {
+    clientIds: [...new Set([...table.allowedClients, ...table.seats.map(seat => seat.clientId)])],
+    playerIds: [...new Set([...table.invitedPlayers, ...(table.createdByPlayer ? [table.createdByPlayer] : [])])]
+  };
+}
+
+// What a lobby is allowed to see. Never includes PINs or client ids,
+// and private invite codes are only given to people at the table (see inviteInfo).
 function publicView(table) {
   return {
     id: table.id,
     name: table.name,
     visibility: table.visibility,
+    hasPin: Boolean(table.passwordHash),
     mode: table.mode,
     solo: table.solo,
     isSystem: table.isSystem,
@@ -100,6 +133,8 @@ class TableStore extends EventEmitter {
         ...doc,
         id: String(doc._id ?? doc.id),
         seats: [],
+        allowedClients: doc.allowedClients ?? [],
+        invitedPlayers: doc.invitedPlayers ?? [],
         createdAt: new Date(doc.createdAt ?? this.now()),
         emptySince: doc.isSystem ? null : new Date(this.now()),
         round: doc.solo ? null : round.newRound()
@@ -121,8 +156,9 @@ class TableStore extends EventEmitter {
     }
   }
 
-  list() {
-    return [...this.tables.values()].map(publicView);
+  // The tables this viewer may see (no viewer: public tables only)
+  list(viewer) {
+    return [...this.tables.values()].filter(table => canSee(table, viewer)).map(publicView);
   }
 
   get(tableId) {
@@ -151,11 +187,12 @@ class TableStore extends EventEmitter {
     return this._reservation(current.table, current.seat, false);
   }
 
+  // input: { name, visibility, password? (private only: an optional 4–6 digit PIN), maxSeats, chips? }
   async create(input = {}, client) {
     const name = String(input.name ?? '').trim().replace(/\s+/g, ' ');
     const visibility = input.visibility ?? 'public';
-    const mode = input.mode ?? 'people';
-    const password = input.password ? String(input.password) : '';
+    const pin = visibility === 'private' && input.password ? String(input.password) : '';
+    const maxSeats = input.maxSeats ?? DEFAULT_SEATS;
 
     if (name.length < 3 || name.length > 30) {
       throw new TableError('invalid_name', 'Table name must be 3 to 30 characters.');
@@ -163,26 +200,29 @@ class TableStore extends EventEmitter {
     if (!['public', 'private'].includes(visibility)) {
       throw new TableError('invalid_input', 'Choose public or private.');
     }
-    if (!['people', 'bots'].includes(mode)) {
-      throw new TableError('invalid_input', 'Choose people or bots.');
+    if (pin && !PIN_PATTERN.test(pin)) {
+      throw new TableError('invalid_pin', 'The PIN must be 4 to 6 digits.');
     }
-    if (visibility === 'private' && !password) {
-      throw new TableError('password_required', 'Private tables need a password.');
+    if (!Number.isInteger(maxSeats) || maxSeats < MIN_SEATS || maxSeats > MAX_SEATS) {
+      throw new TableError('invalid_seats', `Choose ${MIN_SEATS} to ${MAX_SEATS} players.`);
     }
 
-    const passwordHash = visibility === 'private' ? await bcrypt.hash(password, 10) : null;
+    const passwordHash = pin ? await bcrypt.hash(pin, 10) : null;
 
     // Checked after the await so two people can't grab the same name at once
     this._checkNameFree(name);
     this._checkCanSwitch(client.clientId);
     this._releaseEverywhere(client.clientId);
 
+    // Bots only ever deal, so every created table is for people
     const table = this._newTable({
       name,
       visibility,
       passwordHash,
-      mode,
-      createdBy: client.clientId
+      maxSeats,
+      createdBy: client.clientId,
+      createdByPlayer: client.playerId ?? null,
+      allowedClients: [client.clientId]
     });
     this.tables.set(table.id, table);
 
@@ -194,21 +234,10 @@ class TableStore extends EventEmitter {
     return { table: publicView(table), inviteCode: table.inviteCode, seat };
   }
 
+  // Join by tableId (from the lobby) or by inviteCode (invite link or "Have a code?").
+  // password is the private table's PIN, when it has one.
   async join({ tableId, inviteCode, password, chips } = {}, client) {
-    const table = tableId
-      ? this.tables.get(tableId)
-      : [...this.tables.values()].find(t => t.inviteCode === String(inviteCode ?? '').trim().toUpperCase());
-
-    if (!table) {
-      throw new TableError('not_found', 'That table is no longer available.');
-    }
-
-    const alreadyHere = table.seats.some(s => s.clientId === client.clientId);
-
-    if (table.visibility === 'private' && !alreadyHere) {
-      const ok = Boolean(password) && await bcrypt.compare(String(password), table.passwordHash);
-      if (!ok) throw new TableError('bad_password', 'Wrong table password.');
-    }
+    const table = await this._findForJoin({ tableId, inviteCode, password }, client);
 
     // Everything below is synchronous, so seat counts can't change under us
     const current = this.seatOf(client.clientId);
@@ -235,11 +264,107 @@ class TableStore extends EventEmitter {
     // Joining a different table gives up any held seat right away
     this._releaseEverywhere(client.clientId);
 
+    // Got in once: a private table stays in your lobby so you can come back
+    if (!table.allowedClients.includes(client.clientId)) table.allowedClients.push(client.clientId);
+
     const seat = this._takeSeat(table, client, chips);
     this._changed(table);
     this._roundChanged(table);
 
     return { table: publicView(table), seat: seat.index, rejoined: false };
+  }
+
+  // Looks up an invite code without joining, so the browser knows the table's name
+  // and whether to ask for a PIN first.
+  peek({ inviteCode } = {}, client) {
+    const table = this._byInviteCode(inviteCode);
+    if (!table) throw new TableError('not_found', 'No table has that invite code.');
+    return { table: publicView(table), needsPin: this._needsPin(table, client) };
+  }
+
+  // Invite link details for the table you're sitting at. Anyone seated may share it.
+  inviteInfo(clientId) {
+    const { table } = this._invitingSeat(clientId);
+    return {
+      tableId: table.id,
+      tableName: table.name,
+      inviteCode: table.inviteCode,
+      visibility: table.visibility,
+      hasPin: Boolean(table.passwordHash)
+    };
+  }
+
+  // Lets a friend (by account id) see this private table in their lobby.
+  // The socket layer checks that they really are friends and sends the invite.
+  inviteFriend(clientId, playerId) {
+    const { table } = this._invitingSeat(clientId);
+    if (!table.invitedPlayers.includes(playerId)) {
+      table.invitedPlayers.push(playerId);
+      this._changed(table);
+    }
+    return this.inviteInfo(clientId);
+  }
+
+  // "My tables" in History: the tables this player created that are still open.
+  // canDelete is true once nobody (other than the creator's own held seat) is sitting there.
+  mine(viewer) {
+    return [...this.tables.values()]
+      .filter(table => isCreator(table, viewer))
+      .map(table => {
+        const others = table.seats.filter(seat => seat.clientId !== viewer.clientId);
+        const mySeat = table.seats.find(seat => seat.clientId === viewer.clientId);
+        const seatedHere = Boolean(mySeat && !mySeat.reservedUntil);
+        return {
+          ...publicView(table),
+          inviteCode: table.inviteCode,
+          seatedHere,
+          othersSeated: others.length,
+          canDelete: others.length === 0 && !seatedHere
+        };
+      })
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  // Deletes a table you created. Only when it's empty: you can't close a table on other players.
+  remove(viewer, tableId) {
+    const table = this.tables.get(tableId);
+    if (!table || !canSee(table, viewer)) {
+      throw new TableError('not_found', 'That table is already gone.');
+    }
+    if (!isCreator(table, viewer)) {
+      throw new TableError('not_owner', 'Only the person who created a table can delete it.');
+    }
+
+    const mySeat = table.seats.find(seat => seat.clientId === viewer.clientId);
+    if (mySeat && !mySeat.reservedUntil) {
+      throw new TableError('seated_here', 'Leave the table first, then delete it.');
+    }
+    const others = table.seats.filter(seat => seat !== mySeat).length;
+    if (others > 0) {
+      throw new TableError('not_empty', `${others === 1 ? '1 player is' : `${others} players are`} still seated. Tables can only be deleted when empty.`);
+    }
+
+    // Your own seat held from leaving a moment ago goes with it
+    if (mySeat) this._clearHold(table.id, viewer.clientId);
+    this._clearRoundTimer(table);
+    this.tables.delete(table.id);
+    Promise.resolve(this.persist.remove?.(table.id))
+      .catch(error => console.error('Table remove failed:', error.message));
+    if (mySeat) this.emit('seatReleased', { clientId: viewer.clientId, tableId: table.id });
+    this.emit('removed', table.id);
+    return { tableId: table.id };
+  }
+
+  // Chips won from a video ad. At a multiplayer table the server holds the balance,
+  // so it is added to the seat; returns the new seat balance, or null when the
+  // browser keeps the balance itself (lobby, Solo Practice).
+  addChips(clientId, amount) {
+    const current = this.seatOf(clientId);
+    if (!current || current.seat.reservedUntil || !current.table.round) return null;
+
+    current.seat.chips = Math.min(MAX_CHIPS, current.seat.chips + amount);
+    this._roundChanged(current.table);
+    return current.seat.chips;
   }
 
   // Leave the current table. The seat is held for SEAT_HOLD_MS.
@@ -430,11 +555,15 @@ class TableStore extends EventEmitter {
       passwordHash: null,
       mode: 'people',
       solo: false,
-      maxSeats: MAX_SEATS,
+      maxSeats: DEFAULT_SEATS,
       seats: [],
+      // Private tables: who can see the table (client ids) and friends invited to it (account ids)
+      allowedClients: [],
+      invitedPlayers: [],
       minBet: 10,
       maxBet: 500,
       isSystem: false,
+      createdByPlayer: null,
       inviteCode,
       createdAt: new Date(this.now()),
       emptySince: null,
@@ -462,6 +591,54 @@ class TableStore extends EventEmitter {
     table.seats.push(seat);
     table.seats.sort((a, b) => a.index - b.index);
     return seat;
+  }
+
+  // The table to join, after the visibility and PIN checks
+  async _findForJoin({ tableId, inviteCode, password }, client) {
+    if (!tableId) {
+      const table = this._byInviteCode(inviteCode);
+      if (!table) throw new TableError('not_found', 'No table has that invite code.');
+      await this._checkPin(table, password, client);
+      return table;
+    }
+
+    // A hidden table you weren't let into looks the same as one that doesn't exist
+    const table = this.tables.get(tableId);
+    if (!table || !canSee(table, client)) {
+      throw new TableError('not_found', 'That table is no longer available.');
+    }
+    await this._checkPin(table, password, client);
+    return table;
+  }
+
+  async _checkPin(table, password, client) {
+    if (!this._needsPin(table, client)) return;
+    if (!password) throw new TableError('pin_required', 'This table needs a PIN.');
+    const ok = await bcrypt.compare(String(password), table.passwordHash);
+    if (!ok) throw new TableError('bad_password', 'Wrong PIN. Try again.');
+  }
+
+  _byInviteCode(inviteCode) {
+    const code = String(inviteCode ?? '').trim().toUpperCase();
+    if (!code) return null;
+    return [...this.tables.values()].find(t => t.inviteCode === code) ?? null;
+  }
+
+  // The creator and anyone already seated (or holding a seat) skip the PIN
+  _needsPin(table, client) {
+    if (!table.passwordHash || table.createdBy === client.clientId) return false;
+    return !table.seats.some(seat => seat.clientId === client.clientId);
+  }
+
+  _invitingSeat(clientId) {
+    const current = this.seatOf(clientId);
+    if (!current || current.seat.reservedUntil) {
+      throw new TableError('not_seated', 'Sit at a table first.');
+    }
+    if (current.table.solo) {
+      throw new TableError('solo_table', 'Practice is a solo table. Create a table to play with friends.');
+    }
+    return current;
   }
 
   _checkNameFree(name) {
@@ -509,7 +686,7 @@ class TableStore extends EventEmitter {
     else if (!table.emptySince) table.emptySince = new Date(this.now());
 
     this._save(table);
-    this.emit(event, publicView(table));
+    this.emit(event, publicView(table), audienceOf(table));
   }
 
   _save(table) {
@@ -522,7 +699,10 @@ module.exports = {
   TableStore,
   TableError,
   publicView,
+  canSee,
+  MIN_SEATS,
   MAX_SEATS,
+  DEFAULT_SEATS,
   SEAT_HOLD_MS,
   IDLE_TABLE_MS,
   ROUND_TIMING

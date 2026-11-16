@@ -190,3 +190,30 @@ test('getGameHistory should handle database errors', async (t) => {
     'Failed to retrieve game history.'
   );
 });
+
+test('saveGameHistory keeps the table name and valid cards for the History screen', async (t) => {
+  let saved = null;
+  t.mock.method(GameHistory, 'create', async (data) => {
+    saved = data;
+    return { _id: 'history456', ...data };
+  });
+
+  const req = {
+    body: {
+      playerId: 'player123',
+      result: 'win',
+      playerScore: 21,
+      dealerScore: 17,
+      tableName: '  Friday Night  ',
+      playerCards: [{ rank: 'A', suit: 'spades', id: 'x' }, { rank: 'K', suit: 'hearts' }],
+      dealerCards: [{ rank: '9', suit: 'clubs' }, { rank: 'Z', suit: 'moons' }, { hidden: true }]
+    }
+  };
+  const res = createResponse();
+  await saveGameHistory(req, res);
+
+  assert.equal(res.statusCode, 201);
+  assert.equal(saved.tableName, 'Friday Night');
+  assert.deepEqual(saved.playerCards, [{ rank: 'A', suit: 'spades' }, { rank: 'K', suit: 'hearts' }]);
+  assert.deepEqual(saved.dealerCards, [{ rank: '9', suit: 'clubs' }], 'bad or hidden cards are dropped');
+});

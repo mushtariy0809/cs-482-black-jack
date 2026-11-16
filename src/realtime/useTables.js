@@ -26,7 +26,9 @@ let state = {
   reservation: null,
   tableState: null,
   chatMessages: [],
-  privateMessages: [] 
+  privateMessages: [],
+  // Friend invites waiting for an answer: { tableId, tableName, inviteCode, hasPin, fromName, players, maxSeats, sentAt }
+  invites: []
 };
 // Chips the player sits down with (the app keeps the balance between tables)
 let chipsHint = null;
@@ -69,6 +71,12 @@ socket.on('table:chat:message', message => {
   setState({
     chatMessages: [...state.chatMessages, message].slice(-100)
   });
+});
+
+// A friend invited us to their table (shown by InviteToasts)
+socket.on('table:invite', invite => {
+  const others = state.invites.filter(i => i.tableId !== invite.tableId);
+  setState({ invites: [...others, invite].slice(-3) });
 });
 
 socket.on('disconnect', () => setState({ connection: 'reconnecting' }));
@@ -140,9 +148,11 @@ function seated(result) {
 export async function joinTable({ tableId, inviteCode, password }) {
   const result = await request('table:join', { tableId, inviteCode, password, chips: chipsHint ?? undefined });
   seated(result);
+  if (result.ok) dismissInvite(result.table.id);
   return result;
 }
 
+// fields: { name, visibility, password? (4–6 digit PIN, private only), maxSeats }
 export async function createTable(fields) {
   const result = await request('table:create', { ...fields, chips: chipsHint ?? undefined });
   seated(result);
@@ -168,6 +178,57 @@ export function playAction(type) {
 // Tell the server a hand started or ended (drives the In game status)
 export function setInHand(inHand) {
   return request('seat:hand', { inHand });
+}
+
+// Invites (U1) and private tables (T1)
+
+// Looks up an invite code without joining: { table, needsPin }
+export function peekInvite(inviteCode) {
+  return request('table:peek', { inviteCode });
+}
+
+// { tableId, tableName, inviteCode, visibility, hasPin } for the table you're at
+export function getInviteInfo() {
+  return request('table:invite-info');
+}
+
+// Logged-in players only: invite a friend by account id. Resolves to { ok, online }
+export function inviteFriend(playerId) {
+  return request('table:invite', { playerId });
+}
+
+export function dismissInvite(tableId) {
+  if (state.invites.some(i => i.tableId === tableId)) {
+    setState({ invites: state.invites.filter(i => i.tableId !== tableId) });
+  }
+}
+
+// Tables you created (History > My tables): [{ ...table, inviteCode, seatedHere, canDelete }]
+export function getMyTables() {
+  return request('table:mine');
+}
+
+// Only works when nobody is seated (the server checks)
+export function deleteTable(tableId) {
+  return request('table:delete', { tableId });
+}
+
+// Video ads (U21). The server checks the limits and pays the reward.
+
+export function getAdStatus() {
+  return request('ad:status');
+}
+
+export function startAd(adId) {
+  return request('ad:start', { adId });
+}
+
+export function completeAd(viewId) {
+  return request('ad:complete', { viewId });
+}
+
+export function abandonAd(viewId) {
+  return request('ad:abandon', { viewId });
 }
 
 export function sendTableChat(message) {

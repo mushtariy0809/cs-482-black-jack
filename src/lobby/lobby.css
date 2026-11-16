@@ -868,3 +868,206 @@
 .countdown-number.is-urgent {
   color: var(--danger);
 }
+
+/* Create table: visibility, PIN and seat count (T1) */
+
+.setup-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.setup-option-hint {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.setup-options.seat-options {
+  grid-template-columns: repeat(6, minmax(0, 72px));
+  gap: 10px;
+}
+
+.setup-options.seat-options button {
+  min-height: 48px;
+  padding: 0;
+  font-size: 18px;
+}
+
+.setup-seat-hint {
+  margin-top: -14px;
+  color: var(--muted);
+}
+
+.setup-pin {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--line-green);
+  border-radius: 12px;
+  background: rgba(3, 16, 12, 0.45);
+}
+
+.setup-switch {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+}
+
+.setup-switch > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.setup-switch-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* The real checkbox stays focusable but invisible; the track shows its state */
+.setup-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.setup-switch-track {
+  flex: none;
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border: 1px solid #5d5e35;
+  border-radius: 20px;
+  background: #061a14;
+  transition: background 0.2s;
+}
+
+.setup-switch-track > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.setup-switch input:checked + .setup-switch-track {
+  background: #1d5a45;
+  border-color: var(--mint);
+}
+
+.setup-switch input:checked + .setup-switch-track > span {
+  transform: translateX(20px);
+  background: var(--mint);
+}
+
+.setup-switch input:focus-visible + .setup-switch-track {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.setup-pin-field {
+  overflow: hidden;
+}
+
+.setup-pin-row {
+  display: flex;
+  gap: 10px;
+}
+
+.setup-pin-row input {
+  flex: 1;
+  min-width: 0;
+  max-width: 220px;
+  letter-spacing: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-pin-toggle {
+  min-height: 56px;
+  padding: 0 18px;
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .setup-options.seat-options {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+  }
+}
+
+/* PIN prompt opened from an invite popup: covers the screen like the table dialogs */
+.modal-backdrop.is-fixed {
+  position: fixed;
+  z-index: 120;
+  border-radius: 0;
+}
+
+.password-prompt .pin-input {
+  letter-spacing: 8px;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.prompt-help {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* "Have a code?" in the lobby toolbar (U1) */
+
+.code-join {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.code-join input {
+  width: 150px;
+  height: 40px;
+  padding: 0 12px;
+  font: 600 15px Inter, Arial, sans-serif;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--mint-soft);
+  background: linear-gradient(#0d2b22, #061a14);
+  border: 1px solid #5d5e35;
+  border-radius: 10px;
+}
+
+.code-join input::placeholder {
+  letter-spacing: 1px;
+  text-transform: none;
+  color: #c1f4dc80;
+}
+
+.code-join input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.code-join button {
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .code-join {
+    width: 100%;
+  }
+
+  .code-join input {
+    flex: 1;
+    width: auto;
+  }
+}

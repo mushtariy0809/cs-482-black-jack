@@ -4,23 +4,46 @@
 // client -> server (all take an optional ack callback that gets { ok, ...result } or { ok: false, code, message })
 //   lobby:subscribe              start receiving table events, replies with tables:snapshot
 //   lobby:unsubscribe
-//   table:create  { name, visibility, password?, mode, chips? }   creator is seated as a player
+//   table:create  { name, visibility, password?, maxSeats, chips? }   creator is seated as a player.
+//                 password is an optional 4–6 digit PIN for private tables; maxSeats is 2–7.
 //   table:join    { tableId } or { inviteCode }, plus password? and chips? (balance to sit down with)
+//   table:peek    { inviteCode }  -> { table, needsPin } without joining
+//   table:invite-info             -> { tableId, tableName, inviteCode, visibility, hasPin } for your table
+//   table:invite  { playerId }    invite a friend (logged-in players only) -> { online }
+//   table:mine                   -> { tables }  tables you created (History > My tables)
+//   table:delete  { tableId }     delete a table you created; only when nobody is seated
 //   table:leave                  seat is held for 10 seconds
+//   ad:status                    -> { status: { reward, perDay, watchedToday, remaining, nextAt } }
+//   ad:start      { adId? }      -> { viewId, adId, durationMs, status }
+//   ad:complete   { viewId }     -> { reward, status, seatChips }  seatChips: new balance at a multiplayer table, else null
+//   ad:abandon    { viewId }     closed early, no reward
 //   seat:hand     { inHand }     solo tables only: the player's local hand started or ended
 //   round:bet     { amount }     multiplayer tables: place or change your bet while betting
 //   round:action  { type }       multiplayer tables: 'hit' | 'stand' | 'double' | 'split' on your turn
 //
 // server -> client
-//   tables:snapshot  [table]     full list, sent after lobby:subscribe
-//   table:created    table
+//   tables:snapshot  [table]     the tables this player may see, sent after lobby:subscribe
+//   table:created    table       private tables only go to the people let into them
 //   table:updated    table
+//   table:invite     { tableId, tableName, inviteCode, hasPin, fromName, players, maxSeats }   to the invited friend
 //   table:removed    tableId
 //   seat:reserved    { tableId, tableName, seat, expiresAt, forfeited }   only to that player
 //   seat:released    { tableId }                                          only to that player
 //   table:state      round view (see round.js roundView)   to everyone seated at a multiplayer table
 
 const jwt = require('jsonwebtoken');
+const { AdStore } = require('./adStore');
+
+// Are these two accounts friends? (looked up in MongoDB; tests pass their own)
+async function areFriendsInDb(playerId, friendId) {
+  const Player = require('../models/Player');
+  try {
+    return Boolean(await Player.exists({ _id: playerId, friends: friendId }));
+  } catch {
+    // Not a valid account id
+    return false;
+  }
+}
 
 function cleanName(name) {
   const trimmed = String(name ?? '').trim().slice(0, 24);
@@ -102,11 +125,48 @@ function enterTableRoom(ctx, tableId) {
   if (state) io.to(tabs).emit('table:state', state);
 }
 
-function subscribeToLobby({ socket, store }) {
+function subscribeToLobby({ socket, store, client }) {
   socket.join('lobby');
-  const tables = store.list();
+  const tables = store.list(client);
   socket.emit('tables:snapshot', tables);
   return { tables };
+}
+
+// Invite a friend to the table you're at: it shows up in their lobby, and if
+// they're online they get a popup with a Join button.
+async function inviteFriend(ctx, { playerId }) {
+  const { io, store, client, areFriends } = ctx;
+  requireRegistered(client, 'Log in to invite friends.');
+
+  if (typeof playerId !== 'string' || !playerId || playerId === client.playerId) {
+    throw codedError('invalid_friend', 'Pick a friend to invite.');
+  }
+  if (!(await areFriends(client.playerId, playerId))) {
+    throw codedError('not_friends', 'You can only invite people on your friends list.');
+  }
+
+  const info = store.inviteFriend(client.clientId, playerId);
+  const table = store.get(info.tableId);
+  io.to(`player:${playerId}`).emit('table:invite', {
+    tableId: info.tableId,
+    tableName: info.tableName,
+    inviteCode: info.inviteCode,
+    hasPin: info.hasPin,
+    players: table.players,
+    maxSeats: table.maxSeats,
+    fromName: client.name,
+    sentAt: Date.now()
+  });
+
+  const online = (await io.in(`player:${playerId}`).fetchSockets()).length > 0;
+  return { online };
+}
+
+// The ad finished: pay the reward. At a multiplayer table the seat's chips go up on the server.
+function completeAd({ ads, store, client }, payload) {
+  const result = ads.complete(client, payload);
+  const seatChips = store.addChips(client.clientId, result.reward);
+  return { ...result, seatChips };
 }
 
 // Message to everyone at the sender's table (registered players only)
@@ -209,6 +269,15 @@ function registerEvents(ctx) {
     enterTableRoom(ctx, result.table.id);
     return result;
   });
+  handle(socket, 'table:peek', payload => store.peek(payload, client));
+  handle(socket, 'table:invite-info', () => store.inviteInfo(id));
+  handle(socket, 'table:invite', payload => inviteFriend(ctx, payload));
+  handle(socket, 'table:mine', () => ({ tables: store.mine(client) }));
+  handle(socket, 'table:delete', ({ tableId }) => store.remove(client, String(tableId ?? '')));
+  handle(socket, 'ad:status', () => ({ status: ctx.ads.status(client) }));
+  handle(socket, 'ad:start', payload => ({ ...ctx.ads.start(client, payload), status: ctx.ads.status(client) }));
+  handle(socket, 'ad:complete', payload => completeAd(ctx, payload));
+  handle(socket, 'ad:abandon', payload => ctx.ads.abandon(client, payload));
   handle(socket, 'table:chat:send', payload => sendTableChat(ctx, payload));
   handle(socket, 'table:private:send', payload => sendPrivateMessage(ctx, payload));
   handle(socket, 'round:bet', ({ amount }) => store.bet(id, amount));
@@ -224,6 +293,8 @@ function onConnection(shared, socket) {
   const ctx = { ...shared, socket, client };
 
   socket.join(`client:${client.clientId}`);
+  // Friend invites are addressed to the account, so every device it's logged in on gets them
+  if (client.playerId) socket.join(`player:${client.playerId}`);
   shared.openSockets.set(client.clientId, (shared.openSockets.get(client.clientId) ?? 0) + 1);
 
   // A returning player may still have a seat being held for them
@@ -234,9 +305,19 @@ function onConnection(shared, socket) {
 }
 
 // Server -> client events that come from the table store
+// Public tables go to every lobby; private ones only to the people let in (audience from the store)
+function toAudience(io, audience) {
+  if (!audience) return io.to('lobby');
+  const rooms = [
+    ...audience.clientIds.map(clientId => `client:${clientId}`),
+    ...audience.playerIds.map(playerId => `player:${playerId}`)
+  ];
+  return rooms.length ? io.to(rooms) : null;
+}
+
 function forwardStoreEvents({ io, store, tableRooms }) {
-  store.on('created', table => io.to('lobby').emit('table:created', table));
-  store.on('updated', table => io.to('lobby').emit('table:updated', table));
+  store.on('created', (table, audience) => toAudience(io, audience)?.emit('table:created', table));
+  store.on('updated', (table, audience) => toAudience(io, audience)?.emit('table:updated', table));
   store.on('removed', tableId => io.to('lobby').emit('table:removed', tableId));
 
   store.on('seatReserved', ({ clientId, ...reservation }) => {
@@ -252,10 +333,13 @@ function forwardStoreEvents({ io, store, tableRooms }) {
   store.on('round', (tableId, state) => io.to(`table:${tableId}`).emit('table:state', state));
 }
 
-function attachTableSockets(io, store) {
+// options: { ads: AdStore, areFriends(playerId, friendId) } (tests pass their own)
+function attachTableSockets(io, store, { ads = new AdStore(), areFriends = areFriendsInDb } = {}) {
   const shared = {
     io,
     store,
+    ads,
+    areFriends,
     // clientId -> number of open sockets (a player can have several tabs open)
     openSockets: new Map(),
     // clientId -> table whose round updates their tabs receive
