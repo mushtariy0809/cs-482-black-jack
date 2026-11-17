@@ -19,6 +19,11 @@ const playerSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  role: {
+    type: String,
+    enum: ['player', 'admin'],
+    default: 'player'
+  },
   profilePicture: {
     type: String,
     default: ''

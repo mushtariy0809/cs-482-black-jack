@@ -25,6 +25,7 @@ test('validates successfully with required fields and initializes default values
   });
 
   assert.equal(doc.profilePicture, '');
+  assert.equal(doc.role, 'player');
   assert.deepEqual(doc.friends, []);
   assert.deepEqual(doc.sentFriendRequests, []);
   assert.deepEqual(doc.receivedFriendRequests, []);
@@ -209,4 +210,5 @@ test('verifies schema indexes and refs on friend arrays', () => {
   assert.equal(Player.schema.path('friends').options.type[0].ref, 'Player');
   assert.equal(Player.schema.path('sentFriendRequests').options.type[0].ref, 'Player');
   assert.equal(Player.schema.path('receivedFriendRequests').options.type[0].ref, 'Player');
+  assert.deepEqual(Player.schema.path('role').enumValues, ['player', 'admin']);
 });

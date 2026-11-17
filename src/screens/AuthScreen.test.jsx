@@ -16,7 +16,7 @@ function renderAuth(startMode = 'login') {
   return { onSuccess, onGuest, user: userEvent.setup() };
 }
 
-const loggedIn = { token: 'jwt', player: { id: 'p1', username: 'mush', email: 'm@x.com' } };
+const loggedIn = { token: 'jwt', player: { id: 'p1', username: 'mush', email: 'm@x.com', role: 'player' } };
 
 describe('AuthScreen', () => {
   it('logs in with email and password and hands back the player', async () => {
@@ -28,7 +28,32 @@ describe('AuthScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ email: 'm@x.com', password: 'secret123' });
-    expect(onSuccess).toHaveBeenCalledWith({ type: 'registered', name: 'mush', id: 'p1', email: 'm@x.com', token: 'jwt' });
+    expect(onSuccess).toHaveBeenCalledWith({ type: 'registered', name: 'mush', id: 'p1', email: 'm@x.com', token: 'jwt', role: 'player' });
+  });
+
+  it('passes the admin role back after admin login', async () => {
+    mockFetch([{
+      url: 'http://localhost:5000/api/auth/login',
+      method: 'POST',
+      body: {
+        token: 'admin-jwt',
+        player: { id: 'admin1', username: 'Admin', email: 'admin@example.com', role: 'admin' }
+      }
+    }]);
+    const { onSuccess, user } = renderAuth();
+
+    await user.type(screen.getByLabelText('Email'), 'admin@example.com');
+    await user.type(screen.getByLabelText('Password'), 'secret123');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    expect(onSuccess).toHaveBeenCalledWith({
+      type: 'registered',
+      name: 'Admin',
+      id: 'admin1',
+      email: 'admin@example.com',
+      token: 'admin-jwt',
+      role: 'admin'
+    });
   });
 
   it('registers with a username after switching to sign up', async () => {

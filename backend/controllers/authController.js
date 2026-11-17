@@ -6,7 +6,8 @@ const jwt = require('jsonwebtoken');
 const generateToken = (player) => {
   return jwt.sign(
     {
-      playerId: player._id.toString()
+      playerId: player._id.toString(),
+      role: player.role || 'player'
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
@@ -56,7 +57,8 @@ const registerPlayer = async (req, res) => {
     const player = await Player.create({
       username: username.trim(),
       email: email.trim().toLowerCase(),
-      password: hashedPassword
+      password: hashedPassword,
+      role: 'player'
     });
 
     return res.status(201).json({
@@ -65,7 +67,8 @@ const registerPlayer = async (req, res) => {
       player: {
         id: player._id,
         username: player.username,
-        email: player.email
+        email: player.email,
+        role: player.role || 'player'
       }
     });
   } catch (error) {
@@ -116,7 +119,8 @@ const loginPlayer = async (req, res) => {
       player: {
         id: player._id,
         username: player.username,
-        email: player.email
+        email: player.email,
+        role: player.role || 'player'
       }
     });
   } catch (error) {

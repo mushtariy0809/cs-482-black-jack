@@ -240,6 +240,24 @@ test('empty player tables are cleaned up, system tables are not', async () => {
   assert.deepEqual(store.list().map(t => t.id), ['green-room', 'practice']);
 });
 
+test('admin table closure protects system tables and occupied tables', async () => {
+  const removed = [];
+  const store = newStore();
+  store.on('removed', id => removed.push(id));
+
+  assert.throws(() => store.closeEmptyTable('green-room'), { code: 'system_table' });
+
+  const { table } = await store.create({ name: 'Admin Close Test' }, alice);
+  assert.throws(() => store.closeEmptyTable(table.id), { code: 'table_occupied' });
+
+  store.leave(alice.clientId);
+  store.releaseSeat(table.id, alice.clientId);
+  assert.deepEqual(store.closeEmptyTable(table.id), { id: table.id });
+  assert.equal(store.get(table.id), null);
+  assert.deepEqual(removed, [table.id]);
+  store.stop();
+});
+
 test('saved tables load with empty seats', () => {
   const store = new TableStore();
   store.load([{ _id: 'abc', name: 'Old', isSystem: false, seats: [{ index: 0, clientId: 'x' }], inviteCode: 'AAAAAA', maxSeats: 5, createdAt: new Date() }]);
@@ -290,4 +308,12 @@ test('a table can only be deleted by its creator, and only when empty', async ()
   assert.throws(() => store.remove(alice, table.id), { code: 'not_found' });
   assert.throws(() => store.remove(alice, 'green-room'), { code: 'not_owner' });
   store.stop();
+});
+
+test('the admin dashboard sees private tables too', async () => {
+  const store = newStore();
+  await store.create({ name: 'Admin Can See', visibility: 'private' }, alice);
+
+  assert.ok(store.list({ admin: true }).some(t => t.name === 'Admin Can See'));
+  assert.ok(!store.list(bob).some(t => t.name === 'Admin Can See'));
 });

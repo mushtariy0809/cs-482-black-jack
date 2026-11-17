@@ -16,9 +16,10 @@ import HistoryScreen from './screens/HistoryScreen.jsx';
 import ProfileEditor from './screens/ProfileEditor.jsx';
 import SoloGame from './screens/SoloGame.jsx';
 import WelcomeScreen from './screens/WelcomeScreen.jsx';
+import AdminDashboard from './admin/AdminDashboard.jsx';
 import TableChat from './TableChat.jsx';
 import { installUiSounds, preload, setMusic } from './sound/SoundManager.js';
-import { startTables, leaveTable, joinTable, setChipsHint, dismissInvite } from './realtime/useTables.js';
+import { startTables, stopTables, leaveTable, joinTable, setChipsHint, dismissInvite } from './realtime/useTables.js';
 import InvitePanel from './invite/InvitePanel.jsx';
 import InviteToasts from './invite/InviteToasts.jsx';
 import { clearPendingInvite, takeInviteFromUrl } from './invite/inviteLink.js';
@@ -162,6 +163,13 @@ export default function App() {
 
   function enterLobby(newPlayer) {
     setPlayer(newPlayer);
+    if (newPlayer.role === 'admin') {
+      stopTables();
+      setTable(null);
+      setGame(null);
+      setScreen('admin');
+      return;
+    }
     startTables(newPlayer.name, newPlayer.token);
     setScreen('lobby');
   }
@@ -236,6 +244,7 @@ export default function App() {
 
   function logOut() {
     if (table) leaveTable();
+    stopTables();
     setTable(null);
     setPlayer(null);
     setGame(null);
@@ -298,7 +307,7 @@ export default function App() {
           <AuthScreen
             mode={authMode}
             setMode={setAuthMode}
-            onSuccess={({ name, id, email, token }) => enterLobby({ type: 'registered', name, id, email, token })}
+            onSuccess={({ name, id, email, token, role }) => enterLobby({ type: 'registered', name, id, email, token, role })}
             onGuest={() => enterLobby(GUEST)}
           />
         );
@@ -348,58 +357,64 @@ export default function App() {
 
   return (
     <>
-      <AppHeader
-        screen={screen}
-        player={player}
-        chips={chips}
-        onHome={home}
-        onNavigate={setScreen}
-        onLogOut={logOut}
-        adButton={<WatchAdButton status={ads.status} onWatch={watchAd} />}
-      />
+      {screen === 'admin' && player?.role === 'admin' ? (
+        <AdminDashboard player={player} onLogout={logOut} />
+      ) : (
+        <>
+          <AppHeader
+            screen={screen}
+            player={player}
+            chips={chips}
+            onHome={home}
+            onNavigate={setScreen}
+            onLogOut={logOut}
+            adButton={<WatchAdButton status={ads.status} onWatch={watchAd} />}
+          />
 
-      <main ref={main} tabIndex="-1">
-        {inviteCode && !player && (
-          <p className="invite-banner" role="status">
-            You've been invited to a table. Log in or play as a guest to take your seat.
-          </p>
-        )}
-        <AnimatePresence mode="wait">
-          <motion.div key={screen} {...screenMotion}>
-            {renderScreen()}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+          <main ref={main} tabIndex="-1">
+            {inviteCode && !player && (
+              <p className="invite-banner" role="status">
+                You've been invited to a table. Log in or play as a guest to take your seat.
+              </p>
+            )}
+            <AnimatePresence mode="wait">
+              <motion.div key={screen} {...screenMotion}>
+                {renderScreen()}
+              </motion.div>
+            </AnimatePresence>
+          </main>
 
-      <AnimatePresence>
-        {confirmLeave && <LeaveConfirm stake={stake} onConfirm={exitTable} onCancel={() => setConfirmLeave(false)} />}
-      </AnimatePresence>
+          <AnimatePresence>
+            {confirmLeave && <LeaveConfirm stake={stake} onConfirm={exitTable} onCancel={() => setConfirmLeave(false)} />}
+          </AnimatePresence>
 
-      {/* Bottom-left popups: friend invites, out of chips, short notices */}
-      <div className="toast-stack" aria-live="polite">
-        {player && <InviteToasts onJoin={acceptInvite} blockedReason={inHand ? 'Finish this hand first.' : ''} />}
-        <AnimatePresence>
-          {broke && !brokeDismissed && !ads.session && (
-            <OutOfChipsToast
-              key="broke"
-              status={ads.status}
-              minBet={minBet}
-              error={ads.error}
-              onWatch={watchAd}
-              onDismiss={() => setBrokeDismissed(true)}
-            />
-          )}
-          {notice && !broke && (
-            <motion.p key="notice" className="toast toast-notice" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              {notice}
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </div>
+          {/* Bottom-left popups: friend invites, out of chips, short notices */}
+          <div className="toast-stack" aria-live="polite">
+            {player && <InviteToasts onJoin={acceptInvite} blockedReason={inHand ? 'Finish this hand first.' : ''} />}
+            <AnimatePresence>
+              {broke && !brokeDismissed && !ads.session && (
+                <OutOfChipsToast
+                  key="broke"
+                  status={ads.status}
+                  minBet={minBet}
+                  error={ads.error}
+                  onWatch={watchAd}
+                  onDismiss={() => setBrokeDismissed(true)}
+                />
+              )}
+              {notice && !broke && (
+                <motion.p key="notice" className="toast toast-notice" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  {notice}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
 
-      <AnimatePresence>
-        {ads.session && <AdPlayer key={ads.session.viewId} session={ads.session} onFinish={ads.finish} onClose={ads.close} />}
-      </AnimatePresence>
+          <AnimatePresence>
+            {ads.session && <AdPlayer key={ads.session.viewId} session={ads.session} onFinish={ads.finish} onClose={ads.close} />}
+          </AnimatePresence>
+        </>
+      )}
     </>
   );
 }

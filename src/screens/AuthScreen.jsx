@@ -38,7 +38,8 @@ export default function AuthScreen({ mode, setMode, onSuccess, onGuest }) {
         name: data.player.username,
         id: data.player.id,
         email: data.player.email,
-        token: data.token
+        token: data.token,
+        role: data.player.role || 'player'
       });
     } catch (error) {
       setMessage(

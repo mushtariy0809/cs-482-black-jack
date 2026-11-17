@@ -38,17 +38,19 @@ test('registerPlayer should create a new account successfully', async (t) => {
   t.mock.method(Player, 'findOne', async () => null);
   t.mock.method(bcrypt, 'hash', async () => 'hashedPassword');
 
-  t.mock.method(Player, 'create', async (data) => ({
+  const create = t.mock.method(Player, 'create', async (data) => ({
     _id: 'player123',
     username: data.username,
-    email: data.email
+    email: data.email,
+    role: data.role
   }));
 
   const req = {
     body: {
       username: 'PlayerOne',
       email: 'PLAYER@EMAIL.COM',
-      password: 'password123'
+      password: 'password123',
+      role: 'admin'
     }
   };
 
@@ -60,6 +62,8 @@ test('registerPlayer should create a new account successfully', async (t) => {
   assert.equal(res.body.message, 'Account created successfully!');
   assert.equal(res.body.player.username, 'PlayerOne');
   assert.equal(res.body.player.email, 'player@email.com');
+  assert.equal(res.body.player.role, 'player');
+  assert.equal(create.mock.calls[0].arguments[0].role, 'player');
 });
 
 test('registerPlayer should reject missing fields', async (t) => {
@@ -150,7 +154,8 @@ test('loginPlayer should log in an existing player successfully', async (t) => {
     _id: 'player123',
     username: 'PlayerOne',
     email: 'player@email.com',
-    password: 'hashedPassword'
+    password: 'hashedPassword',
+    role: 'player'
   };
 
   t.mock.method(Player, 'findOne', async () => player);
@@ -170,6 +175,33 @@ test('loginPlayer should log in an existing player successfully', async (t) => {
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.message, 'Login successful!');
   assert.equal(res.body.player.username, 'PlayerOne');
+  assert.equal(res.body.player.role, 'player');
+});
+
+test('loginPlayer returns the admin role for an admin account', async (t) => {
+  const player = {
+    _id: 'admin123',
+    username: 'Admin',
+    email: 'admin@example.com',
+    password: 'hashedPassword',
+    role: 'admin'
+  };
+
+  t.mock.method(Player, 'findOne', async () => player);
+  t.mock.method(bcrypt, 'compare', async () => true);
+
+  const res = createResponse();
+
+  await loginPlayer({
+    body: { email: 'admin@example.com', password: 'password123' }
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.player.role, 'admin');
+  assert.equal(
+    require('jsonwebtoken').verify(res.body.token, process.env.JWT_SECRET).role,
+    'admin'
+  );
 });
 
 test('loginPlayer should reject missing email or password', async (t) => {

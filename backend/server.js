@@ -3,6 +3,7 @@ const authRoutes = require('./routes/auth');
 const messagesRoutes = require('./routes/messages');
 const historyRoutes = require('./routes/history');
 const friendsRoutes = require('./routes/friends');
+const adminRoutes = require('./routes/admin');
 
 const express = require('express');
 const cors = require('cors');
@@ -11,6 +12,7 @@ const mongoose = require('mongoose');
 const http = require('http');
 const { Server } = require('socket.io');
 const { startRealtime } = require('./realtime');
+const { ensureAdminAccount } = require('./bootstrapAdmin');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,6 +27,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/', (req, res) => {
   res.send('21 CLUB backend is running!');
@@ -42,13 +45,20 @@ mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
     console.log('MongoDB connected successfully!');
 
+    if (await ensureAdminAccount()) {
+      console.log('Configured admin account created.');
+    }
+
     // Live tables (lobby status, seats) over Socket.IO
-    await startRealtime(io);
+    app.locals.tableStore = await startRealtime(io);
+    app.locals.io = io;
 
     server.listen(PORT, () => {
       console.log(`21 CLUB backend running on port ${PORT}`);
     });
   })
-  .catch((error) => {
-    console.error('MongoDB connection failed:', error.message);
+  .catch(async (error) => {
+    console.error('Server startup failed:', error.message);
+    await mongoose.disconnect();
+    process.exitCode = 1;
   });

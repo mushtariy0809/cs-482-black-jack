@@ -132,6 +132,22 @@ export function startTables(name = 'Guest', token) {
   }
 }
 
+export function stopTables() {
+  socket.disconnect();
+  socket.auth = { clientId: getClientId(), name: 'Guest' };
+  setState({
+    tables: [],
+    connection: 'idle',
+    offline: false,
+    mySeat: null,
+    reservation: null,
+    tableState: null,
+    chatMessages: [],
+    privateMessages: [],
+    invites: []
+  });
+}
+
 // Keeps a table:state that already arrived for this table
 function seated(result) {
   if (!result.ok) return;

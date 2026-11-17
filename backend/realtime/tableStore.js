@@ -62,10 +62,12 @@ function statusOf(table) {
 
 // Private tables are hidden from the lobby. Only people who were let in (the creator,
 // invited friends, anyone who joined with the code) and the players seated there see them.
-// viewer: { clientId, playerId? }
+// viewer: { clientId, playerId? }, or { admin: true } for the admin dashboard.
+// Socket viewers are built on the server from the login token, so players can't claim admin.
 function canSee(table, viewer) {
   if (table.visibility === 'public') return true;
   if (!viewer) return false;
+  if (viewer.admin === true) return true;
   return isCreator(table, viewer)
     || table.allowedClients.includes(viewer.clientId)
     || Boolean(viewer.playerId && table.invitedPlayers.includes(viewer.playerId))
@@ -156,7 +158,7 @@ class TableStore extends EventEmitter {
     }
   }
 
-  // The tables this viewer may see (no viewer: public tables only)
+  // The tables this viewer may see (no viewer: public tables only; { admin: true }: all of them)
   list(viewer) {
     return [...this.tables.values()].filter(table => canSee(table, viewer)).map(publicView);
   }
@@ -164,6 +166,26 @@ class TableStore extends EventEmitter {
   get(tableId) {
     const table = this.tables.get(tableId);
     return table ? publicView(table) : null;
+  }
+
+  closeEmptyTable(tableId) {
+    const table = this.tables.get(tableId);
+    if (!table) {
+      throw new TableError('not_found', 'That table no longer exists.');
+    }
+    if (table.isSystem) {
+      throw new TableError('system_table', 'System tables cannot be closed.');
+    }
+    if (table.seats.length > 0) {
+      throw new TableError('table_occupied', 'Only empty tables can be closed.');
+    }
+
+    this._clearRoundTimer(table);
+    this.tables.delete(tableId);
+    Promise.resolve(this.persist.remove?.(tableId))
+      .catch(error => console.error('Table remove failed:', error.message));
+    this.emit('removed', tableId);
+    return { id: tableId };
   }
 
   // The shared round as players at the table see it (null for solo tables)
