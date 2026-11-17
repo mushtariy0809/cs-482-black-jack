@@ -35,7 +35,7 @@ export function useVideoAds({ enabled, identity, onReward }) {
       return result.message;
     }
     setStatus(result.status);
-    setSession({ viewId: result.viewId, ad: findAd(result.adId), durationMs: result.durationMs });
+    setSession({ viewId: result.viewId, ad: result.ad ?? findAd(result.adId), durationMs: result.durationMs });
     return null;
   }
 

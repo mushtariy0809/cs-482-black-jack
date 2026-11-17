@@ -52,6 +52,59 @@ export const VIDEO_ADS = Object.freeze([
   }
 ]);
 
+// Video ads must be this long (a shorter one isn't worth the chips, a longer one is too much to ask)
+export const MIN_VIDEO_MS = 5 * 1000;
+export const MAX_VIDEO_MS = 60 * 1000;
+
+// Banner ads in the lobby and the table's ad column. shortTitle is used in the narrow table column.
+export const BANNER_ADS = Object.freeze([
+  {
+    id: 'shareair',
+    sponsor: 'ShareAir',
+    headline: 'Your food stinks.',
+    shortTitle: 'Your food stinks.',
+    tagline: 'Secondhand smoke is costing restaurants guests.',
+    image: '/assets/ads/ad-shareair.png'
+  },
+  {
+    id: 'social',
+    sponsor: 'Spark Social',
+    headline: 'Boost your social presence.',
+    shortTitle: 'Boost your reach.',
+    tagline: 'Captivate audiences with social media magic.',
+    image: '/assets/ads/ad-social.png'
+  }
+]);
+
+// Built-in ads in the shape the server's ad catalog uses (and sends to the browser).
+// Admins can archive them or add new ones in the Ad revenue tab.
+export const BUILT_IN_ADS = Object.freeze([
+  ...VIDEO_ADS.map(ad => ({
+    id: ad.id,
+    kind: 'video',
+    sponsor: ad.sponsor,
+    headline: ad.headline,
+    tagline: ad.tagline,
+    shortTitle: '',
+    mediaUrl: ad.video,
+    posterUrl: ad.poster,
+    link: '',
+    durationMs: ad.durationMs
+  })),
+  ...BANNER_ADS.map(ad => ({
+    id: ad.id,
+    kind: 'banner',
+    sponsor: ad.sponsor,
+    headline: ad.headline,
+    tagline: ad.tagline,
+    shortTitle: ad.shortTitle,
+    mediaUrl: ad.image,
+    posterUrl: '',
+    link: '',
+    durationMs: 0
+  }))
+]);
+
 export function findAd(id) {
-  return VIDEO_ADS.find(ad => ad.id === id) ?? null;
+  return BUILT_IN_ADS.find(ad => ad.id === id && ad.kind === 'video') ?? null;
 }

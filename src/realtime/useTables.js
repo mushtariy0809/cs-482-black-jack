@@ -28,8 +28,13 @@ let state = {
   chatMessages: [],
   privateMessages: [],
   // Friend invites waiting for an answer: { tableId, tableName, inviteCode, hasPin, fromName, players, maxSeats, sentAt }
-  invites: []
+  invites: [],
+  // Active video and banner ads from the server (null until it answers: the built-in ads are used)
+  adCatalog: null
 };
+// Ad events waiting for the connection (see trackAd)
+const pendingAdEvents = [];
+
 // Chips the player sits down with (the app keeps the balance between tables)
 let chipsHint = null;
 export function setChipsHint(chips) {
@@ -53,6 +58,11 @@ socket.on('connect', () => {
   // A seat taken in demo mode doesn't exist on the server
   setState({ connection: 'online', offline: false, mySeat: state.offline ? null : state.mySeat });
   socket.emit('lobby:subscribe');
+  socket.emit('ads:list', {}, result => {
+    if (result?.ok) setState({ adCatalog: result.ads });
+  });
+  // Ad impressions/clicks from before the connection was up (the lobby shows its banners right away)
+  pendingAdEvents.splice(0).forEach(event => socket.emit('ad:track', event));
   // Back after a dropped connection: take the held seat again (and get the table's state)
   if (state.mySeat) {
     socket.emit('table:join', { tableId: state.mySeat.tableId }, result => {
@@ -72,6 +82,9 @@ socket.on('table:chat:message', message => {
     chatMessages: [...state.chatMessages, message].slice(-100)
   });
 });
+
+// An admin added, changed or archived an ad
+socket.on('ads:catalog', ads => setState({ adCatalog: ads }));
 
 // A friend invited us to their table (shown by InviteToasts)
 socket.on('table:invite', invite => {
@@ -245,6 +258,16 @@ export function completeAd(viewId) {
 
 export function abandonAd(viewId) {
   return request('ad:abandon', { viewId });
+}
+
+// A banner was shown, or an ad link clicked (A4). Fire and forget: never blocks the UI.
+// placement: 'lobby' | 'table' | 'video'
+// Sent once connected if the socket isn't up yet; dropped in demo mode (no server to count them).
+export function trackAd(adId, type, placement) {
+  if (state.offline) return;
+  const event = { adId, type, placement };
+  if (socket.connected) socket.emit('ad:track', event);
+  else if (pendingAdEvents.length < 50) pendingAdEvents.push(event);
 }
 
 export function sendTableChat(message) {

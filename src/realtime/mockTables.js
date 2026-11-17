@@ -1,4 +1,4 @@
-import { AD_REWARD, ADS_PER_DAY, VIDEO_ADS } from '../../shared/ads.js';
+import { AD_REWARD, ADS_PER_DAY, BUILT_IN_ADS } from '../../shared/ads.js';
 
 // Demo tables shown when the socket server can't be reached,
 // so the lobby still works while the backend is down.
@@ -85,9 +85,12 @@ function mockExtras(event, payload) {
     case 'ad:status':
       return { ok: true, status: demoAdStatus };
     case 'ad:start': {
-      const ad = VIDEO_ADS.find(a => a.id === payload.adId) ?? VIDEO_ADS[demoAdIndex++ % VIDEO_ADS.length];
-      return { ok: true, viewId: `demo-${Date.now()}`, adId: ad.id, durationMs: ad.durationMs, status: demoAdStatus };
+      const videos = BUILT_IN_ADS.filter(a => a.kind === 'video');
+      const ad = videos.find(a => a.id === payload.adId) ?? videos[demoAdIndex++ % videos.length];
+      return { ok: true, viewId: `demo-${Date.now()}`, adId: ad.id, durationMs: ad.durationMs, ad, status: demoAdStatus };
     }
+    case 'ads:list':
+      return { ok: true, ads: BUILT_IN_ADS };
     case 'ad:complete':
       return { ok: true, reward: AD_REWARD, status: demoAdStatus, seatChips: null };
     default:

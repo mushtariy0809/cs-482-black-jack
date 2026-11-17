@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminRequest } from './adminApi.js';
+import AdRevenue from './AdRevenue.jsx';
 import './admin.css';
 
 const number = value => new Intl.NumberFormat().format(value || 0);
@@ -139,7 +140,7 @@ function Overview({ token, overview, loading, onRefresh }) {
           </dl>
         </article>
       </section>
-      <p className="admin-footnote">The dealer is automated. Chip balances and advertising metrics are not currently tracked by the app.</p>
+      <p className="admin-footnote">The dealer is automated. Chip balances are not tracked by the app yet; ad views and clicks are in Ad revenue.</p>
     </>
   );
 }
@@ -313,6 +314,7 @@ export default function AdminDashboard({ player, onLogout }) {
         <nav className="admin-nav" aria-label="Admin navigation">
           <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>Overview</button>
           <button className={tab === 'players' ? 'active' : ''} onClick={() => setTab('players')}>Players</button>
+          <button className={tab === 'ads' ? 'active' : ''} onClick={() => setTab('ads')}>Ad revenue</button>
         </nav>
         <div className="admin-topbar-user">
           <span>{player.name}</span>
@@ -322,9 +324,9 @@ export default function AdminDashboard({ player, onLogout }) {
 
       <main className="admin-main">
         {error && <p className="admin-error" role="alert">{error}</p>}
-        {tab === 'overview'
-          ? <Overview token={player.token} overview={overview} loading={loading} onRefresh={loadOverview} />
-          : <PlayerManagement token={player.token} adminId={player.id} />}
+        {tab === 'overview' && <Overview token={player.token} overview={overview} loading={loading} onRefresh={loadOverview} />}
+        {tab === 'players' && <PlayerManagement token={player.token} adminId={player.id} />}
+        {tab === 'ads' && <AdRevenue token={player.token} />}
       </main>
     </div>
   );

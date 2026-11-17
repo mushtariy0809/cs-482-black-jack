@@ -94,3 +94,43 @@ test('today\'s finished ads from the database still count after a restart', () =
 
   assert.equal(ads.status(player).watchedToday, 1);
 });
+
+test('only active video ads are played, and none left means no ads', () => {
+  const { AdCatalog } = require('../realtime/adCatalog');
+  const catalog = new AdCatalog();
+  const { ads } = (() => {
+    const clock = { now: new Date(2026, 10, 16, 12).getTime() };
+    return { ads: new AdStore({ now: () => clock.now, catalog }) };
+  })();
+
+  for (const ad of catalog.active('video').slice(1)) catalog.update(ad.id, { status: 'archived' });
+  const only = catalog.active('video')[0].id;
+  const started = ads.start(guest);
+  assert.equal(started.adId, only);
+  assert.equal(started.ad.sponsor, catalog.find(only).sponsor, 'the browser gets the ad itself');
+
+  catalog.update(only, { status: 'archived' });
+  assert.throws(() => ads.start(player), { code: 'no_ads' });
+});
+
+test('banner impressions and clicks are saved once, not on every re-render', () => {
+  const { ads, clock } = newAds();
+  const events = [];
+  ads.persist.saveEvent = event => events.push(event);
+
+  assert.equal(ads.track(guest, { adId: 'shareair', type: 'impression', placement: 'lobby' }).recorded, true);
+  assert.equal(ads.track(guest, { adId: 'shareair', type: 'impression', placement: 'lobby' }).recorded, false);
+  assert.equal(ads.track(guest, { adId: 'shareair', type: 'impression', placement: 'table' }).recorded, true, 'another placement counts');
+  assert.equal(ads.track(player, { adId: 'shareair', type: 'impression', placement: 'lobby' }).recorded, true, 'another viewer counts');
+
+  clock.now += 60_000;
+  assert.equal(ads.track(guest, { adId: 'shareair', type: 'impression', placement: 'lobby' }).recorded, true);
+
+  assert.equal(ads.track(guest, { adId: 'spark-social', type: 'click', placement: 'video' }).recorded, true);
+  assert.equal(ads.track(guest, { adId: 'spark-social', type: 'click', placement: 'video' }).recorded, false, 'double click');
+
+  assert.equal(events.length, 5);
+  assert.deepEqual(Object.keys(events[0]).sort(), ['adId', 'createdAt', 'placement', 'type', 'viewerKey']);
+  assert.throws(() => ads.track(guest, { adId: 'shareair', type: 'hover', placement: 'lobby' }), { code: 'invalid_event' });
+  assert.throws(() => ads.track(guest, { adId: 'nope', type: 'click', placement: 'lobby' }), { code: 'no_ad' });
+});

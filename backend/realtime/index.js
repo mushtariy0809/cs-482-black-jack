@@ -1,6 +1,9 @@
 
 const Table = require('../models/Table');
 const AdView = require('../models/AdView');
+const AdEvent = require('../models/AdEvent');
+const Ad = require('../models/Ad');
+const { AdCatalog } = require('./adCatalog');
 const { TableStore } = require('./tableStore');
 const { AdStore, startOfDay } = require('./adStore');
 const { attachTableSockets } = require('./socket');
@@ -65,19 +68,49 @@ function adViewPersistence() {
         completedAt: view.completedAt
       },
       { upsert: true }
+    ),
+    // Banner impressions and ad link clicks
+    saveEvent: event => AdEvent.create(event)
+  };
+}
+
+// The ads players see, as admins add, edit and archive them
+function adCatalogPersistence() {
+  return {
+    save: ad => Ad.findByIdAndUpdate(
+      ad.id,
+      {
+        kind: ad.kind,
+        sponsor: ad.sponsor,
+        headline: ad.headline,
+        tagline: ad.tagline,
+        shortTitle: ad.shortTitle,
+        mediaUrl: ad.mediaUrl,
+        posterUrl: ad.posterUrl,
+        link: ad.link,
+        durationMs: ad.durationMs,
+        status: ad.status,
+        builtIn: ad.builtIn,
+        createdAt: ad.createdAt
+      },
+      { upsert: true }
     )
   };
 }
 
-// Call after MongoDB is connected
-async function startRealtime(io) {
+// Call after MongoDB is connected.
+// locals (Express app.locals): gets adCatalog for the admin Ad revenue routes.
+async function startRealtime(io, locals) {
   const store = new TableStore({ persist: mongoPersistence() });
-  const ads = new AdStore({ persist: adViewPersistence() });
+  const catalog = new AdCatalog({ persist: adCatalogPersistence() });
+  catalog.load(await Ad.find().lean());
+  const ads = new AdStore({ persist: adViewPersistence(), catalog });
+  if (locals) locals.adCatalog = catalog;
 
   store.load(await Table.find().lean());
   store.ensureSystemTables();
   ads.load(await AdView.find({ status: 'completed', completedAt: { $gte: new Date(startOfDay(Date.now())) } }).lean());
-  attachTableSockets(io, store, { ads });
+  attachTableSockets(io, store, { ads, catalog });
 
   setInterval(() => store.sweepIdle(), SWEEP_EVERY_MS).unref();
 

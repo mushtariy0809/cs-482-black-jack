@@ -17,6 +17,8 @@
 //   ad:start      { adId? }      -> { viewId, adId, durationMs, status }
 //   ad:complete   { viewId }     -> { reward, status, seatChips }  seatChips: new balance at a multiplayer table, else null
 //   ad:abandon    { viewId }     closed early, no reward
+//   ads:list                     -> { ads }  the active video and banner ads
+//   ad:track      { adId, type: 'impression' | 'click', placement: 'lobby' | 'table' | 'video' }
 //   seat:hand     { inHand }     solo tables only: the player's local hand started or ended
 //   round:bet     { amount }     multiplayer tables: place or change your bet while betting
 //   round:action  { type }       multiplayer tables: 'hit' | 'stand' | 'double' | 'split' on your turn
@@ -26,6 +28,7 @@
 //   table:created    table       private tables only go to the people let into them
 //   table:updated    table
 //   table:invite     { tableId, tableName, inviteCode, hasPin, fromName, players, maxSeats }   to the invited friend
+//   ads:catalog      [ad]        to everyone, after an admin adds, edits or archives an ad
 //   table:removed    tableId
 //   seat:reserved    { tableId, tableName, seat, expiresAt, forfeited }   only to that player
 //   seat:released    { tableId }                                          only to that player
@@ -278,6 +281,8 @@ function registerEvents(ctx) {
   handle(socket, 'ad:start', payload => ({ ...ctx.ads.start(client, payload), status: ctx.ads.status(client) }));
   handle(socket, 'ad:complete', payload => completeAd(ctx, payload));
   handle(socket, 'ad:abandon', payload => ctx.ads.abandon(client, payload));
+  handle(socket, 'ads:list', () => ({ ads: ctx.catalog.publicList() }));
+  handle(socket, 'ad:track', payload => ctx.ads.track(client, payload));
   handle(socket, 'table:chat:send', payload => sendTableChat(ctx, payload));
   handle(socket, 'table:private:send', payload => sendPrivateMessage(ctx, payload));
   handle(socket, 'round:bet', ({ amount }) => store.bet(id, amount));
@@ -333,18 +338,22 @@ function forwardStoreEvents({ io, store, tableRooms }) {
   store.on('round', (tableId, state) => io.to(`table:${tableId}`).emit('table:state', state));
 }
 
-// options: { ads: AdStore, areFriends(playerId, friendId) } (tests pass their own)
-function attachTableSockets(io, store, { ads = new AdStore(), areFriends = areFriendsInDb } = {}) {
+// options: { ads: AdStore, catalog: AdCatalog, areFriends(playerId, friendId) } (tests pass their own)
+function attachTableSockets(io, store, { ads = new AdStore(), catalog = ads.catalog, areFriends = areFriendsInDb } = {}) {
   const shared = {
     io,
     store,
     ads,
+    catalog,
     areFriends,
     // clientId -> number of open sockets (a player can have several tabs open)
     openSockets: new Map(),
     // clientId -> table whose round updates their tabs receive
     tableRooms: new Map()
   };
+
+  // Players see new or archived ads right away
+  catalog.on('changed', () => io.emit('ads:catalog', catalog.publicList()));
 
   io.use(authenticateSocket);
   io.on('connection', socket => onConnection(shared, socket));

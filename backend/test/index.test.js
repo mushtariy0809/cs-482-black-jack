@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Table = require('../models/Table.js');
 const AdView = require('../models/AdView.js');
+const Ad = require('../models/Ad.js');
 const { startRealtime } = require('../realtime/index.js');
 
 /**
@@ -29,6 +30,9 @@ test.beforeEach(() => {
   // Video ad views (U21) are loaded at startup too
   AdView.find = () => ({ lean: () => Promise.resolve([]) });
   AdView.findByIdAndUpdate = (id, update) => Promise.resolve({ _id: id, ...update });
+  // The ad catalog (A4) is loaded at startup; the built-in ads are saved on a fresh database
+  Ad.find = () => ({ lean: () => Promise.resolve([]) });
+  Ad.findByIdAndUpdate = (id, update) => Promise.resolve({ _id: id, ...update });
 });
 
 test('startRealtime initializes store, loads tables, and sets up sweep interval', async (t) => {

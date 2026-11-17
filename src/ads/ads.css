@@ -251,3 +251,26 @@
     transition: none;
   }
 }
+
+/* "Visit sponsor" on the video (A4: counted as a click) */
+.ad-visit {
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: 20px;
+  background: var(--gold);
+  pointer-events: auto;
+}
+
+.ad-visit:hover {
+  filter: brightness(1.08);
+}
+
+.ad-visit:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}

@@ -6,6 +6,7 @@ const friendsRoutes = require('./routes/friends');
 const adminRoutes = require('./routes/admin');
 
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -28,6 +29,11 @@ app.use('/api/history', historyRoutes);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/admin', adminRoutes);
+// Ad videos and banner images uploaded by admins (A4)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  index: false,
+  setHeaders: res => res.set('X-Content-Type-Options', 'nosniff')
+}));
 
 app.get('/', (req, res) => {
   res.send('21 CLUB backend is running!');
@@ -50,7 +56,7 @@ mongoose.connect(process.env.MONGO_URI)
     }
 
     // Live tables (lobby status, seats) over Socket.IO
-    app.locals.tableStore = await startRealtime(io);
+    app.locals.tableStore = await startRealtime(io, app.locals);
     app.locals.io = io;
 
     server.listen(PORT, () => {

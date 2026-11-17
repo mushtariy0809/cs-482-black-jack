@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useDialogFocus } from '../components/useDismiss.js';
 import { getSettings, play } from '../sound/SoundManager.js';
+import { trackAd } from '../realtime/useTables.js';
+import { mediaSrc } from './catalog.js';
 import './ads.css';
 
 // Full-screen video ad (U21). It's the ad itself, so covering the page is fine.
@@ -166,8 +168,8 @@ export default function AdPlayer({ session, onFinish, onClose }) {
         <div className="ad-screen">
           <video
             ref={video}
-            src={ad.video}
-            poster={ad.poster}
+            src={mediaSrc(ad.mediaUrl)}
+            poster={mediaSrc(ad.posterUrl) || undefined}
             playsInline
             preload="auto"
             muted={muted}
@@ -210,6 +212,18 @@ export default function AdPlayer({ session, onFinish, onClose }) {
             <span className="ad-sponsor">{ad.sponsor}</span>
             <strong className="ad-headline">{ad.headline}</strong>
             <span className="ad-tagline">{ad.tagline}</span>
+            {/* Opens in a new tab; the video pauses while that tab is open, so the reward isn't lost */}
+            {ad.link && (
+              <a
+                className="ad-visit"
+                href={ad.link}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                onClick={() => trackAd(ad.id, 'click', 'video')}
+              >
+                Visit {ad.sponsor} ↗
+              </a>
+            )}
           </div>
 
           {finished && (

@@ -1,0 +1,250 @@
+/* A4 Ad revenue tab (built on the admin.css look) */
+
+.admin-ad-heading-actions,
+.admin-ads-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line-green);
+  border-radius: 9px;
+  background: rgba(3, 16, 12, 0.55);
+}
+
+.admin-segmented button {
+  min-height: 30px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #9ab6a8;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.admin-segmented button.active {
+  color: var(--ink);
+  background: var(--mint);
+}
+
+.admin-feedback {
+  margin: 12px 0 0;
+  color: var(--mint-soft);
+  font-size: 12px;
+}
+
+.admin-ads-panel {
+  margin-top: 18px;
+}
+
+.admin-ads-toolbar {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.admin-ads-archived-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9ab6a8;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.admin-ads-new {
+  min-height: 36px;
+  padding: 7px 16px;
+  font-size: 13px;
+}
+
+/* Ads table */
+
+.admin-ad-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 240px;
+}
+
+.admin-ad-cell > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  white-space: normal;
+}
+
+.admin-ad-cell strong {
+  color: var(--cream);
+  font-size: 12px;
+}
+
+.admin-ad-cell small,
+.admin-muted {
+  color: #829e90;
+  font-size: 11px;
+}
+
+.admin-ad-thumb {
+  flex: none;
+  width: 72px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid rgba(115, 145, 127, 0.25);
+  border-radius: 6px;
+  background: #020806;
+}
+
+.admin-ad-thumb video,
+.admin-ad-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-ad-link a {
+  display: inline-block;
+  max-width: 200px;
+  overflow: hidden;
+  color: var(--mint-soft);
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.admin-status-archived {
+  background: rgba(115, 145, 127, 0.14);
+  color: #9ab6a8;
+}
+
+.admin-ad-archived td {
+  opacity: 0.6;
+}
+
+.admin-ad-archived td.admin-ad-actions {
+  opacity: 1;
+}
+
+.admin-ad-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.admin-ad-actions button {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+/* New / edit form */
+
+.admin-ad-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+  border-color: var(--gold-line);
+}
+
+.admin-ad-form .admin-section-heading {
+  margin-bottom: 0;
+}
+
+.admin-ad-form-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-ad-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 340px);
+  gap: 20px;
+}
+
+.admin-ad-form-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-ad-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #9ab6a8;
+  font-size: 11px;
+}
+
+.admin-ad-field input {
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid var(--line-green);
+  border-radius: 8px;
+  background: #061a14;
+  color: var(--cream);
+  font: 13px Inter, Arial, sans-serif;
+}
+
+.admin-ad-field input[type='file'] {
+  padding: 7px;
+  color: #9ab6a8;
+  font-size: 12px;
+}
+
+.admin-ad-field input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.admin-ad-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 160px;
+  padding: 10px;
+  border: 1px dashed rgba(115, 145, 127, 0.35);
+  border-radius: 10px;
+  background: rgba(3, 16, 12, 0.55);
+}
+
+.admin-ad-preview video,
+.admin-ad-preview img {
+  width: 100%;
+  max-height: 220px;
+  border-radius: 6px;
+  object-fit: contain;
+  background: #000;
+}
+
+.admin-ad-preview small {
+  color: #9ab6a8;
+  font-size: 11px;
+}
+
+.admin-ad-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-ad-form-actions .primary {
+  min-height: 38px;
+  padding: 8px 20px;
+  font-size: 13px;
+}
+
+@media (max-width: 850px) {
+  .admin-ad-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-page-heading {
+    flex-wrap: wrap;
+  }
+}

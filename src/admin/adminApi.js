@@ -18,3 +18,12 @@ export async function adminRequest(token, path, options = {}) {
 
   return data;
 }
+
+// Uploads an ad video (MP4) or banner image as-is (A4). Resolves to { url, kind, durationMs }.
+export function adminUpload(token, file) {
+  return adminRequest(token, '/ads/media', {
+    method: 'POST',
+    body: file,
+    headers: { 'Content-Type': file.type }
+  });
+}
