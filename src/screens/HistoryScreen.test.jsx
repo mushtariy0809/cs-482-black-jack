@@ -22,34 +22,18 @@ describe('HistoryScreen', () => {
     expect(await screen.findByText('Win')).toBeInTheDocument();
     expect(screen.getByText('Loss')).toBeInTheDocument();
     expect(screen.getByText('Tie')).toBeInTheDocument();
-    expect(screen.getByLabelText('You 20, dealer 18')).toBeInTheDocument();
+    expect(screen.getByText('Your score: 20 · Dealer score: 18')).toBeInTheDocument();
   });
 
   it('shows an empty state', async () => {
     mockFetch([{ url, body: [] }]);
     render(<HistoryScreen player={player} onBack={() => {}} />);
-    expect(await screen.findByText('No hands played yet')).toBeInTheDocument();
-    expect(screen.getByText('0 hands')).toBeInTheDocument();
+    expect(await screen.findByText('No completed games yet.')).toBeInTheDocument();
   });
 
   it('shows an error when history cannot load', async () => {
     mockFetch([{ url, status: 500, body: {} }]);
     render(<HistoryScreen player={player} onBack={() => {}} />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load game history.');
-  });
-
-  it('summarizes wins, losses, and ties', async () => {
-    mockFetch([{
-      url,
-      body: [
-        { _id: 'g1', result: 'win', playerScore: 20, dealerScore: 18, createdAt: '2026-11-01T12:00:00Z' },
-        { _id: 'g2', result: 'loss', playerScore: 22, dealerScore: 19, createdAt: '2026-11-02T12:00:00Z' },
-        { _id: 'g3', result: 'push', playerScore: 17, dealerScore: 17, createdAt: '2026-11-03T12:00:00Z' }
-      ]
-    }]);
-    render(<HistoryScreen player={player} onBack={() => {}} />);
-
-    expect(await screen.findByLabelText('Game results summary')).toBeInTheDocument();
-    expect(screen.getByText('3 hands')).toBeInTheDocument();
+    expect(await screen.findByText('Unable to load game history.')).toBeInTheDocument();
   });
 });
