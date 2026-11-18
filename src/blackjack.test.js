@@ -14,6 +14,7 @@ import {
   doubleDown,
   splitHand,
   resolvePayout,
+  resolveInsurance
 } from './blackjack.js';
 
 const hand = (...ranks) => ranks.map((rank) => ({ rank, suit: 'spades' }));
