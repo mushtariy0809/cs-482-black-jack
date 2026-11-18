@@ -6,6 +6,8 @@ export default function ProfileEditor({ player, onSave, onCancel }) {
   const [profilePicture, setProfilePicture] = useState(
     player.profilePicture || ''
   );
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const avatars = [
     'avatar1.jpg',
@@ -20,13 +22,36 @@ export default function ProfileEditor({ player, onSave, onCancel }) {
     const file = event.target.files[0];
 
     if (file) {
+      if (file.size > 4 * 1024 * 1024) {
+        setError('Choose an image smaller than 4 MB.');
+        return;
+      }
+
+      setError('');
       const reader = new FileReader();
 
       reader.onloadend = () => {
-        setProfilePicture(reader.result);
+        if (typeof reader.result === 'string') {
+          setProfilePicture(reader.result);
+        } else {
+          setError('Unable to read selected image.');
+        }
       };
+      reader.onerror = () => setError('Unable to read selected image.');
 
       reader.readAsDataURL(file);
+    }
+  }
+
+  async function handleSave() {
+    setError('');
+    setSaving(true);
+    try {
+      await onSave({ name: username, profilePicture });
+    } catch (saveError) {
+      setError(saveError.message || 'Unable to save profile changes.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -73,12 +98,15 @@ export default function ProfileEditor({ player, onSave, onCancel }) {
         </div>
       )}
 
+      {error && <p className="form-error" role="alert">{error}</p>}
+
       <div className="profile-editor-actions">
         <button
           type="button"
-          onClick={() => onSave({ name: username, profilePicture })}
+          onClick={handleSave}
+          disabled={saving}
         >
-          Save Changes
+          {saving ? 'Saving...' : 'Save Changes'}
         </button>
 
         <button type="button" onClick={onCancel}>

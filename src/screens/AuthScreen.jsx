@@ -39,7 +39,8 @@ export default function AuthScreen({ mode, setMode, onSuccess, onGuest }) {
         id: data.player.id,
         email: data.player.email,
         token: data.token,
-        role: data.player.role || 'player'
+        role: data.player.role || 'player',
+        profilePicture: data.player.profilePicture || ''
       });
     } catch (error) {
       setMessage(

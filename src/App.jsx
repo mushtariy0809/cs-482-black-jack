@@ -251,8 +251,29 @@ export default function App() {
     setScreen('start');
   }
 
-  function saveProfile(updatedProfile) {
-    setPlayer({ ...player, name: updatedProfile.name, profilePicture: updatedProfile.profilePicture });
+  async function saveProfile(updatedProfile) {
+    const response = await fetch('http://localhost:5000/api/auth/profile', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${player.token}`
+      },
+      body: JSON.stringify({
+        username: updatedProfile.name,
+        profilePicture: updatedProfile.profilePicture
+      })
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Unable to save profile changes.');
+    }
+
+    setPlayer({
+      ...player,
+      name: data.player.username,
+      profilePicture: data.player.profilePicture
+    });
     home();
   }
 
@@ -307,7 +328,7 @@ export default function App() {
           <AuthScreen
             mode={authMode}
             setMode={setAuthMode}
-            onSuccess={({ name, id, email, token, role }) => enterLobby({ type: 'registered', name, id, email, token, role })}
+            onSuccess={({ name, id, email, token, role, profilePicture }) => enterLobby({ type: 'registered', name, id, email, token, role, profilePicture })}
             onGuest={() => enterLobby(GUEST)}
           />
         );

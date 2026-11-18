@@ -7,7 +7,8 @@ const Player = require('../models/Player');
 
 const {
   registerPlayer,
-  loginPlayer
+  loginPlayer,
+  updatePlayerProfile
 } = require('../controllers/authController');
 
 process.env.JWT_SECRET = 'test-secret-key';
@@ -155,7 +156,8 @@ test('loginPlayer should log in an existing player successfully', async (t) => {
     username: 'PlayerOne',
     email: 'player@email.com',
     password: 'hashedPassword',
-    role: 'player'
+    role: 'player',
+    profilePicture: '/assets/avatar2.jpg'
   };
 
   t.mock.method(Player, 'findOne', async () => player);
@@ -176,6 +178,7 @@ test('loginPlayer should log in an existing player successfully', async (t) => {
   assert.equal(res.body.message, 'Login successful!');
   assert.equal(res.body.player.username, 'PlayerOne');
   assert.equal(res.body.player.role, 'player');
+  assert.equal(res.body.player.profilePicture, '/assets/avatar2.jpg');
 });
 
 test('loginPlayer returns the admin role for an admin account', async (t) => {
@@ -255,4 +258,44 @@ test('loginPlayer should reject incorrect credentials', async (t) => {
 
   assert.equal(res.statusCode, 401);
   assert.equal(res.body.message, 'Invalid email or password.');
+});
+
+test('updatePlayerProfile saves the authenticated player profile', async (t) => {
+  const updatedPlayer = {
+    _id: 'player123',
+    username: 'NewName',
+    profilePicture: '/assets/avatar3.jpg'
+  };
+  const updateProfile = t.mock.method(Player, 'updateProfile', async () => updatedPlayer);
+  const req = {
+    player: { _id: 'player123' },
+    body: { username: ' NewName ', profilePicture: '/assets/avatar3.jpg' }
+  };
+  const res = createResponse();
+
+  await updatePlayerProfile(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(updateProfile.mock.calls[0].arguments, [
+    'player123',
+    { username: 'NewName', profilePicture: '/assets/avatar3.jpg' }
+  ]);
+  assert.deepEqual(res.body.player, {
+    id: 'player123',
+    username: 'NewName',
+    profilePicture: '/assets/avatar3.jpg'
+  });
+});
+
+test('updatePlayerProfile rejects invalid profile data', async () => {
+  const req = {
+    player: { _id: 'player123' },
+    body: { username: '   ', profilePicture: 123 }
+  };
+  const res = createResponse();
+
+  await updatePlayerProfile(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.message, 'Invalid profile information.');
 });
