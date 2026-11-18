@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const GameHistory = require('../models/GameHistory');
 const Player = require('../models/Player');
@@ -229,10 +230,116 @@ async function grantPlayerChips(req, res) {
   }
 }
 
+async function createPlayer(req, res) {
+  const { username, email, password, role = 'player', chips = 1000 } = req.body || {};
+
+  if (typeof username !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ message: 'Username, email, and password are required.' });
+  }
+
+  const cleanUsername = username.trim();
+  const cleanEmail = email.trim().toLowerCase();
+  const startingChips = Number(chips);
+
+  if (!cleanUsername || !cleanEmail) {
+    return res.status(400).json({ message: 'Username, email, and password are required.' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    return res.status(400).json({ message: 'Enter a valid email address.' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
+  }
+  if (!ROLES.includes(role)) {
+    return res.status(400).json({ message: 'Choose Player or Admin.' });
+  }
+  if (!Number.isInteger(startingChips) || startingChips < 0 || startingChips > MAX_CHIPS) {
+    return res.status(400).json({ message: 'Starting chips must be a non-negative whole number.' });
+  }
+
+  try {
+    const existing = await Player.findOne({
+      $or: [
+        { username: cleanUsername },
+        { email: cleanEmail }
+      ]
+    });
+    if (existing) {
+      return res.status(409).json({ message: 'Username or email is already registered.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const player = await Player.create({
+      username: cleanUsername,
+      email: cleanEmail,
+      password: hashedPassword,
+      role,
+      chips: startingChips
+    });
+
+    return res.status(201).json(publicPlayer(player));
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'Username or email is already registered.' });
+    }
+    console.error('Admin create player error:', error.message);
+    return res.status(500).json({ message: 'Unable to create user account.' });
+  }
+}
+
+async function deletePlayer(req, res) {
+  const { playerId } = req.params;
+
+  if (!mongoose.isValidObjectId(playerId)) {
+    return res.status(400).json({ message: 'Invalid player ID.' });
+  }
+  if (String(req.admin._id) === playerId) {
+    return res.status(400).json({ message: 'You cannot delete your own admin account.' });
+  }
+
+  try {
+    const player = await Player.findById(playerId);
+    if (!player) return res.status(404).json({ message: 'Player not found.' });
+
+    if (player.role === 'admin') {
+      const adminCount = await Player.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: 'The last admin account cannot be deleted.' });
+      }
+    }
+
+    disconnectPlayerSockets(req.app?.locals?.io, playerId);
+    if (typeof Player.updateMany === 'function') {
+      await Player.updateMany(
+        {},
+        {
+          $pull: {
+            friends: player._id,
+            sentFriendRequests: player._id,
+            receivedFriendRequests: player._id
+          }
+        }
+      );
+    }
+    await Player.findByIdAndDelete(playerId);
+
+    return res.json({
+      message: 'Player account deleted.',
+      id: String(player._id),
+      username: player.username
+    });
+  } catch (error) {
+    console.error('Admin delete player error:', error.message);
+    return res.status(500).json({ message: 'Unable to delete user account.' });
+  }
+}
+
 module.exports = {
   getOverview,
   listPlayers,
+  createPlayer,
   updatePlayerRole,
   grantPlayerChips,
+  deletePlayer,
   closeTable
 };

@@ -145,6 +145,119 @@ function Overview({ token, overview, loading, onRefresh }) {
   );
 }
 
+function CreateUserForm({ token, onCreated, onCancel }) {
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('player');
+  const [chips, setChips] = useState('1000');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const cleanUsername = username.trim();
+    const cleanEmail = email.trim();
+    const startingChips = Number(chips);
+
+    if (!cleanUsername || !cleanEmail || !password) {
+      return setError('Username, email, and password are required.');
+    }
+    if (password.length < 8) {
+      return setError('Password must be at least 8 characters long.');
+    }
+    if (!Number.isInteger(startingChips) || startingChips < 0) {
+      return setError('Starting chips must be a non-negative whole number.');
+    }
+
+    setError('');
+    setBusy(true);
+    try {
+      const created = await adminRequest(token, '/players', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: cleanUsername,
+          email: cleanEmail,
+          password,
+          role,
+          chips: startingChips
+        })
+      });
+      onCreated(created);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="admin-panel admin-user-form" onSubmit={handleSubmit} noValidate aria-label="Add new user">
+      <div className="admin-section-heading">
+        <div>
+          <h2>Add new user</h2>
+          <p className="admin-panel-subtitle">Create a registered player or admin account</p>
+        </div>
+      </div>
+
+      <div className="admin-user-form-grid">
+        <label className="admin-field">
+          Username
+          <input
+            type="text"
+            value={username}
+            onChange={event => { setUsername(event.target.value); setError(''); }}
+            placeholder="Choose a username"
+          />
+        </label>
+        <label className="admin-field">
+          Email
+          <input
+            type="email"
+            value={email}
+            onChange={event => { setEmail(event.target.value); setError(''); }}
+            placeholder="user@example.com"
+          />
+        </label>
+        <label className="admin-field">
+          Password
+          <input
+            type="password"
+            value={password}
+            onChange={event => { setPassword(event.target.value); setError(''); }}
+            placeholder="At least 8 characters"
+          />
+        </label>
+        <label className="admin-field">
+          Account role
+          <select value={role} onChange={event => setRole(event.target.value)}>
+            <option value="player">Player</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <label className="admin-field">
+          Starting chips
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={chips}
+            onChange={event => { setChips(event.target.value); setError(''); }}
+          />
+        </label>
+      </div>
+
+      {error && <p className="admin-error" role="alert">{error}</p>}
+      <div className="admin-user-form-actions">
+        <button type="button" className="admin-quiet-button" onClick={onCancel} disabled={busy}>Cancel</button>
+        <button type="submit" className="primary" disabled={busy}>
+          {busy ? 'Creating…' : 'Create user'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function PlayerManagement({ token, adminId }) {
   const [players, setPlayers] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -153,6 +266,8 @@ function PlayerManagement({ token, adminId }) {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [grantingChips, setGrantingChips] = useState(false);
+  const [deletingPlayer, setDeletingPlayer] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const loadPlayers = useCallback(async () => {
     setLoading(true);
@@ -216,6 +331,35 @@ function PlayerManagement({ token, adminId }) {
     }
   }
 
+  async function deleteSelectedPlayer() {
+    if (!selectedPlayer || isSelf || deletingPlayer) return;
+    setMessage('');
+    setDeletingPlayer(true);
+    try {
+      await adminRequest(token, `/players/${selectedPlayer.id}`, {
+        method: 'DELETE'
+      });
+      const removed = selectedPlayer;
+      setPlayers(current => {
+        const remaining = current.filter(item => item.id !== removed.id);
+        setSelectedId(remaining[0]?.id || '');
+        return remaining;
+      });
+      setMessage(`Deleted account ${removed.username}.`);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setDeletingPlayer(false);
+    }
+  }
+
+  function handleUserCreated(created) {
+    setPlayers(current => [created, ...current.filter(item => item.id !== created.id)]);
+    setSelectedId(created.id);
+    setShowCreateForm(false);
+    setMessage(`Created account for ${created.username}.`);
+  }
+
   return (
     <>
       <div className="admin-page-heading">
@@ -223,7 +367,17 @@ function PlayerManagement({ token, adminId }) {
           <h1>Players &amp; permissions</h1>
           <p>Manage registered players and assign account roles</p>
         </div>
+        <button type="button" className="primary" onClick={() => setShowCreateForm(open => !open)}>
+          {showCreateForm ? 'Close form' : '+ Add user'}
+        </button>
       </div>
+      {showCreateForm && (
+        <CreateUserForm
+          token={token}
+          onCreated={handleUserCreated}
+          onCancel={() => setShowCreateForm(false)}
+        />
+      )}
       <div className="admin-player-layout">
         <section className="admin-panel admin-player-list">
           <label className="admin-search">
@@ -287,12 +441,15 @@ function PlayerManagement({ token, adminId }) {
               <p className="admin-permission-note">
                 Admins can assign account roles and view operations. Dealers remain automated and cannot be assigned as account roles.
               </p>
-              {isSelf && <p className="admin-footnote">For safety, you cannot remove your own admin role.</p>}
+              {isSelf && <p className="admin-footnote">For safety, you cannot remove your own admin role or delete your own account.</p>}
               <button className="primary wide" onClick={saveRole} disabled={selectedRole === selectedPlayer.role}>
                 Save role
               </button>
               <button type="button" className="wide admin-grant-chips" onClick={giveChips} disabled={grantingChips}>
                 {grantingChips ? 'Giving chips…' : 'Give 1,000 chips'}
+              </button>
+              <button type="button" className="wide admin-delete-player" onClick={deleteSelectedPlayer} disabled={isSelf || deletingPlayer}>
+                {deletingPlayer ? 'Deleting…' : 'Delete account'}
               </button>
               {selectedPlayer.createdAt && (
                 <p className="admin-account-date">Joined {new Date(selectedPlayer.createdAt).toLocaleDateString()}</p>

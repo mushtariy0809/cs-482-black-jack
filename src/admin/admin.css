@@ -349,6 +349,7 @@
 }
 
 .admin-search input,
+.admin-field input,
 .admin-field select {
   width: 100%;
   min-height: 40px;
@@ -362,6 +363,7 @@
 }
 
 .admin-search input:focus,
+.admin-field input:focus,
 .admin-field select:focus {
   border-color: var(--mint);
 }
@@ -471,6 +473,35 @@
   margin-top: 12px;
   border-color: var(--gold-line);
   color: var(--gold);
+}
+
+.admin-delete-player {
+  margin-top: 10px;
+  border-color: rgba(240, 138, 119, 0.45);
+  color: #f0a08d;
+}
+
+.admin-user-form {
+  margin-bottom: 18px;
+}
+
+.admin-user-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.admin-user-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.admin-user-form-actions button {
+  min-height: 38px;
+  padding: 8px 16px;
+  font-size: 12px;
 }
 
 .admin-feedback,

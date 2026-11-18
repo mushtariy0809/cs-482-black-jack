@@ -3,8 +3,10 @@ const requireAdmin = require('../middleware/requireAdmin');
 const {
   getOverview,
   listPlayers,
+  createPlayer,
   updatePlayerRole,
   grantPlayerChips,
+  deletePlayer,
   closeTable
 } = require('../controllers/adminController');
 const {
@@ -20,8 +22,10 @@ const router = express.Router();
 router.use(requireAdmin);
 router.get('/overview', getOverview);
 router.get('/players', listPlayers);
+router.post('/players', createPlayer);
 router.patch('/players/:playerId/role', updatePlayerRole);
 router.post('/players/:playerId/chips', grantPlayerChips);
+router.delete('/players/:playerId', deletePlayer);
 router.delete('/tables/:tableId', closeTable);
 
 // A4 Ad revenue: totals, and the ads players see
