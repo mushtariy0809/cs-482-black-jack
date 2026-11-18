@@ -30,7 +30,8 @@ let state = {
   // Friend invites waiting for an answer: { tableId, tableName, inviteCode, hasPin, fromName, players, maxSeats, sentAt }
   invites: [],
   // Active video and banner ads from the server (null until it answers: the built-in ads are used)
-  adCatalog: null
+  adCatalog: null,
+  chipGrant: null
 };
 // Ad events waiting for the connection (see trackAd)
 const pendingAdEvents = [];
@@ -90,6 +91,11 @@ socket.on('ads:catalog', ads => setState({ adCatalog: ads }));
 socket.on('table:invite', invite => {
   const others = state.invites.filter(i => i.tableId !== invite.tableId);
   setState({ invites: [...others, invite].slice(-3) });
+});
+
+// An admin granted chips to this player's account
+socket.on('chips:granted', ({ amount, chips }) => {
+  setState({ chipGrant: { id: Date.now() + Math.random(), amount, chips } });
 });
 
 socket.on('disconnect', () => setState({ connection: 'reconnecting' }));
@@ -157,7 +163,8 @@ export function stopTables() {
     tableState: null,
     chatMessages: [],
     privateMessages: [],
-    invites: []
+    invites: [],
+    chipGrant: null
   });
 }
 

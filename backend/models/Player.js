@@ -24,6 +24,11 @@ const playerSchema = new mongoose.Schema({
     enum: ['player', 'admin'],
     default: 'player'
   },
+  chips: {
+    type: Number,
+    default: 1000,
+    min: 0
+  },
   profilePicture: {
     type: String,
     default: ''

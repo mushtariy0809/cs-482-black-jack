@@ -445,6 +445,34 @@
   font-size: 11px;
 }
 
+.admin-player-chips {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--gold-line);
+  border-radius: 8px;
+  background: rgba(5, 14, 11, 0.45);
+}
+
+.admin-player-chips span {
+  color: #9ab6a8;
+  font-size: 11px;
+}
+
+.admin-player-chips strong {
+  color: var(--gold);
+  font-size: 13px;
+}
+
+.admin-grant-chips {
+  margin-top: 12px;
+  border-color: var(--gold-line);
+  color: var(--gold);
+}
+
 .admin-feedback,
 .admin-error {
   padding: 10px 14px;

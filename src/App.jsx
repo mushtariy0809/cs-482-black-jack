@@ -19,7 +19,7 @@ import WelcomeScreen from './screens/WelcomeScreen.jsx';
 import AdminDashboard from './admin/AdminDashboard.jsx';
 import TableChat from './TableChat.jsx';
 import { installUiSounds, preload, setMusic } from './sound/SoundManager.js';
-import { startTables, stopTables, leaveTable, joinTable, setChipsHint, dismissInvite } from './realtime/useTables.js';
+import { startTables, stopTables, leaveTable, joinTable, setChipsHint, dismissInvite, useTables } from './realtime/useTables.js';
 import InvitePanel from './invite/InvitePanel.jsx';
 import InviteToasts from './invite/InviteToasts.jsx';
 import { clearPendingInvite, takeInviteFromUrl } from './invite/inviteLink.js';
@@ -102,8 +102,10 @@ export default function App() {
 
   const session = useTableSession({ table, screen, game });
   const { live, mySeat, offline, shared, sharedState, mySharedSeat, inHand, stake } = session;
+  const { chipGrant } = useTables();
   const [chips, setChips] = useChips(game, mySharedSeat);
   const timeLeft = usePlayerTimer(game, setGame);
+  const lastGrantId = useRef(null);
   const registered = player?.type === 'registered';
 
   const ads = useVideoAds({ enabled: Boolean(player), identity: player?.token ?? 'guest', onReward: collectAdReward });
@@ -117,6 +119,17 @@ export default function App() {
   useEffect(() => {
     if (!broke) setBrokeDismissed(false);
   }, [broke]);
+
+  // Apply live admin chip grants when the player is logged in
+  useEffect(() => {
+    if (!registered || !chipGrant || chipGrant.id === lastGrantId.current) return;
+    lastGrantId.current = chipGrant.id;
+    if (!mySharedSeat) {
+      if (game) setGame(current => current && { ...current, money: current.money + chipGrant.amount });
+      else setChips(current => current + chipGrant.amount);
+    }
+    setNotice(`Admin added ${chipGrant.amount.toLocaleString()} chips to your account.`);
+  }, [chipGrant, registered, mySharedSeat, game]);
 
   // Short messages (ad errors) disappear on their own
   useEffect(() => {
@@ -163,6 +176,7 @@ export default function App() {
 
   function enterLobby(newPlayer) {
     setPlayer(newPlayer);
+    setChips(newPlayer.chips ?? 1000);
     if (newPlayer.role === 'admin') {
       stopTables();
       setTable(null);
@@ -307,7 +321,7 @@ export default function App() {
           <AuthScreen
             mode={authMode}
             setMode={setAuthMode}
-            onSuccess={({ name, id, email, token, role }) => enterLobby({ type: 'registered', name, id, email, token, role })}
+            onSuccess={({ name, id, email, token, role,chips: accountChips }) => enterLobby({ type: 'registered', name, id, email, token, role, chips: accountChips })}
             onGuest={() => enterLobby(GUEST)}
           />
         );

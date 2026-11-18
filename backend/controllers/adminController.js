@@ -3,6 +3,8 @@ const GameHistory = require('../models/GameHistory');
 const Player = require('../models/Player');
 
 const ROLES = ['player', 'admin'];
+const ADMIN_CHIP_GRANT = 1000;
+const MAX_CHIPS = 10_000_000;
 
 function publicPlayer(player) {
   return {
@@ -10,6 +12,7 @@ function publicPlayer(player) {
     username: player.username,
     email: player.email,
     role: player.role || 'player',
+    chips: player.chips ?? 1000,
     createdAt: player.createdAt
   };
 }
@@ -104,7 +107,7 @@ async function listPlayers(req, res) {
       : {};
 
     const players = await Player.find(query)
-      .select('username email role createdAt')
+      .select('username email role chips createdAt')
       .sort({ createdAt: -1 })
       .limit(500)
       .lean();
@@ -184,9 +187,52 @@ async function closeTable(req, res) {
   }
 }
 
+async function grantPlayerChips(req, res) {
+  const { playerId } = req.params;
+  const rawAmount = req.body?.amount;
+  const amount = rawAmount === undefined ? ADMIN_CHIP_GRANT : Number(rawAmount);
+
+  if (!mongoose.isValidObjectId(playerId)) {
+    return res.status(400).json({ message: 'Invalid player ID.' });
+  }
+  if (!Number.isInteger(amount) || amount <= 0 || amount > 100000) {
+    return res.status(400).json({ message: 'Chip grant must be a positive whole number.' });
+  }
+
+  try {
+    const player = await Player.findById(playerId);
+    if (!player) return res.status(404).json({ message: 'Player not found.' });
+
+    player.chips = Math.min(MAX_CHIPS, (player.chips ?? 1000) + amount);
+    await player.save();
+
+    const io = req.app?.locals?.io;
+    const tableStore = req.app?.locals?.tableStore;
+    const onlineClients = new Set();
+    for (const socket of io?.sockets?.sockets?.values() || []) {
+      if (String(socket.data.client?.playerId) === playerId && socket.data.client?.clientId) {
+        onlineClients.add(socket.data.client.clientId);
+      }
+    }
+    for (const clientId of onlineClients) {
+      tableStore?.addChips?.(clientId, amount);
+    }
+    io?.to?.(`player:${playerId}`)?.emit?.('chips:granted', {
+      amount,
+      chips: player.chips
+    });
+
+    return res.json(publicPlayer(player));
+  } catch (error) {
+    console.error('Admin chip grant error:', error.message);
+    return res.status(500).json({ message: 'Unable to grant chips.' });
+  }
+}
+
 module.exports = {
   getOverview,
   listPlayers,
   updatePlayerRole,
+  grantPlayerChips,
   closeTable
 };

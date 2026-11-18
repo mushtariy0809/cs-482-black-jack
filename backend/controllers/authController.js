@@ -68,7 +68,8 @@ const registerPlayer = async (req, res) => {
         id: player._id,
         username: player.username,
         email: player.email,
-        role: player.role || 'player'
+        role: player.role || 'player',
+        chips: player.chips ?? 1000
       }
     });
   } catch (error) {
@@ -120,7 +121,8 @@ const loginPlayer = async (req, res) => {
         id: player._id,
         username: player.username,
         email: player.email,
-        role: player.role || 'player'
+        role: player.role || 'player',
+        chips: player.chips ?? 1000
       }
     });
   } catch (error) {

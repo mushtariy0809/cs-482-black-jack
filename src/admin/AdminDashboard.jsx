@@ -152,6 +152,7 @@ function PlayerManagement({ token, adminId }) {
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [grantingChips, setGrantingChips] = useState(false);
 
   const loadPlayers = useCallback(async () => {
     setLoading(true);
@@ -197,6 +198,24 @@ function PlayerManagement({ token, adminId }) {
     }
   }
 
+  async function giveChips() {
+    if (!selectedPlayer || grantingChips) return;
+    setMessage('');
+    setGrantingChips(true);
+    try {
+      const updated = await adminRequest(token, `/players/${selectedPlayer.id}/chips`, {
+        method: 'POST',
+        body: JSON.stringify({ amount: 1000 })
+      });
+      setPlayers(current => current.map(item => item.id === updated.id ? updated : item));
+      setMessage(`Gave 1,000 chips to ${updated.username}.`);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setGrantingChips(false);
+    }
+  }
+
   return (
     <>
       <div className="admin-page-heading">
@@ -218,7 +237,7 @@ function PlayerManagement({ token, adminId }) {
           </label>
           <div className="admin-table-scroll">
             <table className="admin-table">
-              <thead><tr><th>Player</th><th>Role</th><th>Joined</th><th>Status</th></tr></thead>
+              <thead><tr><th>Player</th><th>Role</th><th>Chips</th><th>Joined</th><th>Status</th></tr></thead>
               <tbody>
                 {players.map(item => (
                   <tr
@@ -233,12 +252,13 @@ function PlayerManagement({ token, adminId }) {
                   >
                     <td><strong>{item.username}</strong><small>{item.email}</small></td>
                     <td><span className={`admin-role-tag admin-role-${item.role}`}>{item.role}</span></td>
+                    <td>{number(item.chips ?? 1000)}</td>
                     <td>{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}</td>
                     <td><span className="admin-status admin-status-active">Active</span></td>
                   </tr>
                 ))}
                 {!players.length && (
-                  <tr><td colSpan="4" className="admin-empty">{loading ? 'Loading players…' : message ? 'Unable to display player accounts.' : 'No player accounts found.'}</td></tr>
+                  <tr><td colSpan="5" className="admin-empty">{loading ? 'Loading players…' : message ? 'Unable to display player accounts.' : 'No player accounts found.'}</td></tr>
                 )}
               </tbody>
             </table>
@@ -253,6 +273,10 @@ function PlayerManagement({ token, adminId }) {
                 <div className="admin-avatar">{selectedPlayer.username.charAt(0).toUpperCase()}</div>
                 <div><h2>{selectedPlayer.username}</h2><p>{selectedPlayer.email}</p></div>
               </div>
+              <div className="admin-player-chips">
+                <span>Chips balance</span>
+                <strong>{number(selectedPlayer.chips ?? 1000)} chips</strong>
+              </div>
               <label className="admin-field">
                 Role
                 <select value={selectedRole} onChange={event => setSelectedRole(event.target.value)} disabled={isSelf}>
@@ -266,6 +290,9 @@ function PlayerManagement({ token, adminId }) {
               {isSelf && <p className="admin-footnote">For safety, you cannot remove your own admin role.</p>}
               <button className="primary wide" onClick={saveRole} disabled={selectedRole === selectedPlayer.role}>
                 Save role
+              </button>
+              <button type="button" className="wide admin-grant-chips" onClick={giveChips} disabled={grantingChips}>
+                {grantingChips ? 'Giving chips…' : 'Give 1,000 chips'}
               </button>
               {selectedPlayer.createdAt && (
                 <p className="admin-account-date">Joined {new Date(selectedPlayer.createdAt).toLocaleDateString()}</p>

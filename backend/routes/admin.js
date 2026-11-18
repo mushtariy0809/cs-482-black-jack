@@ -4,6 +4,7 @@ const {
   getOverview,
   listPlayers,
   updatePlayerRole,
+  grantPlayerChips,
   closeTable
 } = require('../controllers/adminController');
 const {
@@ -20,6 +21,7 @@ router.use(requireAdmin);
 router.get('/overview', getOverview);
 router.get('/players', listPlayers);
 router.patch('/players/:playerId/role', updatePlayerRole);
+router.post('/players/:playerId/chips', grantPlayerChips);
 router.delete('/tables/:tableId', closeTable);
 
 // A4 Ad revenue: totals, and the ads players see
