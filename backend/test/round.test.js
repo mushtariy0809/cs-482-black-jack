@@ -223,3 +223,56 @@ test('both browsers receive the same table state over the socket', async t => {
   const outOfTurn = await send(stateA.turn?.seat === 0 ? windowB : windowA, 'round:action', { type: 'hit' });
   if (stateA.phase === 'playing') assert.equal(outOfTurn.code, 'not_your_turn');
 });
+
+test('multiplayer insurance pays 2:1 on dealer blackjack and shows No blackjack otherwise', () => {
+  const table = { id: 't-ins', minBet: 10, maxBet: 500, seats: [], round: round.newRound() };
+  const seatA = { index: 0, name: 'Alice', chips: 1000, bet: 100, hands: [] };
+  const seatB = { index: 1, name: 'Bob', chips: 1000, bet: 100, hands: [] };
+  table.seats.push(seatA, seatB);
+
+  round.deal(table);
+  // Set up Ace up-card with dealer blackjack
+  table.round.phase = 'insurance';
+  table.round.dealer = [card('A', 1), card('K', 2)];
+  seatA.chips = 900;
+  seatB.chips = 900;
+  seatA.hands = [{ cards: [card('9', 3), card('8', 4)], bet: 100, done: false, result: null, payout: 0 }];
+  seatB.hands = [{ cards: [card('10', 5), card('7', 6)], bet: 100, done: false, result: null, payout: 0 }];
+  seatA.insurance = null;
+  seatB.insurance = null;
+
+  round.decideInsurance(table, seatA, true);
+  assert.equal(seatA.insuranceBet, 50);
+  assert.equal(seatA.chips, 850);
+  assert.equal(round.everyoneDecidedInsurance(table), false);
+
+  round.decideInsurance(table, seatB, false);
+  assert.equal(round.everyoneDecidedInsurance(table), true);
+
+  round.resolveInsurancePhase(table);
+  assert.equal(table.round.phase, 'settled');
+  assert.equal(seatA.chips, 1000); // broke even via 2:1 insurance payout
+  assert.equal(seatB.chips, 900);
+
+  // Now test non-blackjack Ace up-card: continues to playing with "No blackjack."
+  table.round = round.newRound(2);
+  table.round.phase = 'insurance';
+  table.round.dealer = [card('A', 7), card('6', 8)];
+  seatA.chips = 900;
+  seatB.chips = 900;
+  seatA.hands = [{ cards: [card('9', 9), card('8', 10)], bet: 100, done: false, result: null, payout: 0 }];
+  seatB.hands = [{ cards: [card('10', 11), card('7', 12)], bet: 100, done: false, result: null, payout: 0 }];
+  seatA.insurance = null;
+  seatA.insuranceBet = 0;
+  seatB.insurance = null;
+  seatB.insuranceBet = 0;
+
+  round.decideInsurance(table, seatA, true);
+  round.decideInsurance(table, seatB, false);
+  round.resolveInsurancePhase(table);
+
+  assert.equal(table.round.phase, 'playing');
+  assert.equal(table.round.insuranceMessage, 'No blackjack.');
+  assert.equal(seatA.chips, 850);
+  assert.deepEqual(table.round.turn, { seat: 0, hand: 0 });
+});

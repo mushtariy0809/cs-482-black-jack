@@ -286,6 +286,7 @@ function registerEvents(ctx) {
   handle(socket, 'table:chat:send', payload => sendTableChat(ctx, payload));
   handle(socket, 'table:private:send', payload => sendPrivateMessage(ctx, payload));
   handle(socket, 'round:bet', ({ amount }) => store.bet(id, amount));
+  handle(socket, 'round:insurance', ({ take }) => store.insurance(id, Boolean(take)));
   handle(socket, 'round:action', ({ type }) => store.action(id, type));
   handle(socket, 'table:leave', () => ({ reservation: store.leave(id) }));
   handle(socket, 'seat:hand', ({ inHand }) => store.setInHand(id, Boolean(inHand)) ?? {});

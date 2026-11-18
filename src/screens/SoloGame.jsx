@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { startGame, dealRound, hit, stand, doubleDown, splitHand, scoreHand, isPair } from '../blackjack.js';
+import { startGame, dealRound, hit, stand, doubleDown, splitHand, scoreHand, isPair, insuranceCost } from '../blackjack.js';
 import TableFx, { DealtCard, ScorePill, dealDelay } from '../table/TableFx.jsx';
 import TableStage from '../table/TableStage.jsx';
 import Card from '../components/Card.jsx';
@@ -64,7 +64,19 @@ function DealerHand({ game, finished }) {
 
 function TableMessage({ game, finished, timeLeft }) {
   const playing = game.phase === 'player';
-  const text = game.phase === 'ready' ? 'Your table is ready.' : finished ? RESULT_MESSAGES[game.result] : 'Your turn';
+  const insurance = game.phase === 'insurance';
+  let text;
+  if (game.phase === 'ready') {
+    text = 'Your table is ready.';
+  } else if (insurance) {
+    text = `Dealer shows an Ace · Insurance (${insuranceCost(game.bet)} chips)?`;
+  } else if (finished) {
+    text = game.insuranceMessage
+      ? `${game.insuranceMessage} ${RESULT_MESSAGES[game.result]}`
+      : RESULT_MESSAGES[game.result];
+  } else {
+    text = game.insuranceMessage ? `${game.insuranceMessage} · Your turn` : 'Your turn';
+  }
 
   return (
     <div className="table-message" role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' }}>
@@ -208,11 +220,37 @@ function PlayControls({ game, setGame }) {
   );
 }
 
+function InsuranceControls({ game, setGame }) {
+  const cost = insuranceCost(game.bet);
+  const canAfford = game.money >= cost;
+
+  return (
+    <>
+      <div className="controls-bet">
+        <span className="controls-label">INSURANCE</span>
+        <strong>{cost} chips (50%)</strong>
+        <span className="controls-balance">Pays 2:1 if Dealer has Blackjack</span>
+      </div>
+      <button
+        className="primary controls-main"
+        disabled={!canAfford}
+        onClick={() => setGame(resolveInsurance(game, true))}
+      >
+        Take Insurance ({cost})
+      </button>
+      <button onClick={() => setGame(resolveInsurance(game, false))}>
+        No Insurance
+      </button>
+    </>
+  );
+}
+
 // Controls bar (practice-controls: these buttons make card/chip sounds instead of a click)
 function GameControls(props) {
   const { game } = props;
   let controls;
   if (game.phase === 'ready') controls = <BetControls {...props} />;
+  else if (game.phase === 'insurance') controls = <InsuranceControls {...props} />;
   else if (game.phase === 'finished') controls = <ResultActions {...props} />;
   else controls = <PlayControls {...props} />;
 

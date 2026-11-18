@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { isPair, scoreHand } from '../blackjack.js';
-import { placeBet, playAction } from '../realtime/useTables.js';
+import { insuranceCost, isPair, scoreHand } from '../blackjack.js';
+import { decideInsurance, placeBet, playAction } from '../realtime/useTables.js';
 import TableFx, { DealtCard, ScorePill, dealDelay } from './TableFx.jsx';
 import TableStage from './TableStage.jsx';
 import './multiplayer.css';
@@ -63,16 +63,29 @@ function statusText(tableState, mine, turnSeat, myTurn) {
     case 'betting':
       if (mine?.bet) return 'Bet placed · waiting for the others';
       return 'Place your bet';
-    case 'playing':
-      if (myTurn) return 'Your turn';
-      if (!myHands.length) return `${turnSeat?.name ?? 'A player'} is playing · you're in next hand`;
-      return `${turnSeat?.name ?? 'A player'}'s turn`;
+    case 'insurance':
+      if (myHands.length && mine?.insurance == null) {
+        return `Dealer shows an Ace · Insurance (${insuranceCost(mine.bet)} chips)?`;
+      }
+      if (mine?.insurance === 'insured') return 'Insurance placed · waiting for the others';
+      if (mine?.insurance === 'declined') return 'No insurance · waiting for the others';
+      return 'Insurance round · waiting for the table';
+    case 'playing': {
+      const prefix = tableState.insuranceMessage ? `${tableState.insuranceMessage} · ` : '';
+      if (myTurn) return `${prefix}Your turn`;
+      if (!myHands.length) return `${prefix}${turnSeat?.name ?? 'A player'} is playing · you're in next hand`;
+      return `${prefix}${turnSeat?.name ?? 'A player'}'s turn`;
+    }
     case 'dealer':
       return "Dealer's turn";
     case 'settled': {
-      if (!myHands.length) return 'Hand over';
+      if (!myHands.length) return tableState.insuranceMessage || 'Hand over';
       const results = myHands.map(resultLabel).filter(Boolean);
-      return results.length ? results.join(' · ') : 'Hand over';
+      const base = results.length ? results.join(' · ') : 'Hand over';
+      if (tableState.insuranceMessage === 'Dealer has Blackjack!' && mine?.insuranceBet > 0) {
+        return `Dealer Blackjack · Insurance pays 2:1 · ${base}`;
+      }
+      return base;
     }
     default:
       return '';
@@ -82,6 +95,7 @@ function statusText(tableState, mine, turnSeat, myTurn) {
 function timerText(phase, seconds) {
   if (seconds == null) return null;
   if (phase === 'betting') return `Dealing in ${seconds}s`;
+  if (phase === 'insurance') return `Insurance closes in ${seconds}s`;
   if (phase === 'settled') return `Next hand in ${seconds}s`;
   if (phase === 'playing') return `${seconds}s`;
   return null;
@@ -277,6 +291,27 @@ export default function MultiplayerGame({ tableState, mySeatIndex, maxSeats = 5,
                     {mine.bet ? `Change bet (${pick})` : `Bet ${pick}`}
                   </button>
                 </>
+              ) : tableState.phase === 'insurance' && mine && myHands.length > 0 && mine.insurance == null ? (
+                <>
+                  <div className="controls-bet">
+                    <span className="controls-label">INSURANCE</span>
+                    <strong>{insuranceCost(mine.bet)} chips (50%)</strong>
+                    <span className="controls-balance">Pays 2:1 if Dealer has Blackjack</span>
+                  </div>
+                  <button
+                    className="primary controls-main"
+                    disabled={busy || chips < insuranceCost(mine.bet)}
+                    onClick={() => send(() => decideInsurance(true))}
+                  >
+                    Take Insurance ({insuranceCost(mine.bet)})
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => send(() => decideInsurance(false))}
+                  >
+                    No Insurance
+                  </button>
+                </>  
               ) : myTurn ? (
                 <>
                   <button disabled={busy || !canDouble} onClick={() => send(() => playAction('double'))}>Double</button>

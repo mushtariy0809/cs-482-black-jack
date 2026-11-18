@@ -199,6 +199,10 @@ export function placeBet(amount) {
   return request('round:bet', { amount });
 }
 
+export function decideInsurance(take) {
+  return request('round:insurance', { take });
+}
+
 // type: 'hit' | 'stand' | 'double' | 'split'
 export function playAction(type) {
   return request('round:action', { type });

@@ -193,3 +193,33 @@ test('evaluates natural blackjack payout correctly', () => {
   const payoutMoney = resolvePayout(90, 10, 'player', g.hands[0].cards);
   assert.strictEqual(payoutMoney, 115);
 });
+
+test('insurance is offered on dealer Ace and pays 2:1 on dealer blackjack', () => {
+  // pop() deals: player[0]=9, dealer[0]=A, player[1]=8, dealer[1]=K
+  const g = { ...startGame(1000), deck: hand('K', '8', 'A', '9') };
+
+  const dealt = dealRound(g, 100);
+  assert.equal(dealt.phase, 'insurance');
+  assert.equal(dealt.money, 900);
+
+  const insured = resolveInsurance(dealt, true);
+  assert.equal(insured.phase, 'finished');
+  assert.equal(insured.insuranceBet, 50);
+  assert.equal(insured.result, 'dealer');
+  // 900 - 50 (insurance) + 150 (2:1 insurance payout) = 1000
+  assert.equal(insured.money, 1000);
+});
+
+test('insurance shows No blackjack and continues play when dealer lacks blackjack', () => {
+  // pop() deals: player[0]=9, dealer[0]=A, player[1]=8, dealer[1]=6
+  const g = { ...startGame(1000), deck: hand('6', '8', 'A', '9') };
+
+  const dealt = dealRound(g, 100);
+  assert.equal(dealt.phase, 'insurance');
+
+  const continued = resolveInsurance(dealt, true);
+  assert.equal(continued.phase, 'player');
+  assert.equal(continued.insuranceBet, 50);
+  assert.equal(continued.insuranceMessage, 'No blackjack.');
+  assert.equal(continued.money, 850);
+});

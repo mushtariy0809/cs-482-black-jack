@@ -6,12 +6,13 @@ const crypto = require('crypto');
 //
 // Phases:
 //   betting  players place bets; deals when everyone has bet or the timer runs out
+//   insurance  offered when dealer shows an Ace; players choose 50% insurance or decline
 //   playing  seats act one at a time, in seat order, one hand at a time
 //   dealer   short pause, then the bot dealer draws and every hand is settled
 //   settled  results are shown, then the table goes back to betting
 
 // Rules shared with the browser's solo game (see shared/rules.js)
-const { RANKS, SUITS, scoreHand, compareHands, dealerShouldHit, payoutFor: payoutForCards, isPair } = require('../../shared/rules.js');
+const { RANKS, SUITS, scoreHand, compareHands, dealerShouldHit, payoutFor: payoutForCards, isPair, offersInsurance, insuranceCost, insurancePayout } = require('../../shared/rules.js');
 
 class RoundError extends Error {
   constructor(code, message) {
@@ -37,7 +38,7 @@ function shuffledDeck(roundNumber, exclude = new Set()) {
 }
 
 function newRound(number = 1) {
-  return { number, phase: 'betting', deck: [], dealer: [], turn: null, deadline: null };
+  return { number, phase: 'betting', deck: [], dealer: [], turn: null, deadline: null, insuranceMessage: null };
 }
 
 function cardsInPlay(table) {
@@ -102,17 +103,27 @@ function deal(table) {
   round.deck = shuffledDeck(round.number);
   round.refills = 0;
   round.dealer = [];
+  round.insuranceMessage = null;
 
   for (const seat of players) {
     seat.chips -= seat.bet;
     seat.hands = [{ cards: [], bet: seat.bet, done: false, result: null, payout: 0 }];
     seat.activeHandIndex = 0;
     seat.inHand = true;
+    seat.insurance = null;
+    seat.insuranceBet = 0;
+    seat.insurancePayout = 0;
   }
   // Same order as at a real table: one card each, dealer, then a second card each, dealer
   for (let pass = 0; pass < 2; pass++) {
     for (const seat of players) seat.hands[0].cards.push(draw(table));
     round.dealer.push(draw(table));
+  }
+
+  if (offersInsurance(round.dealer)) {
+    round.phase = 'insurance';
+    round.turn = null;
+    return true;
   }
 
   const dealerBlackjack = scoreHand(round.dealer).blackjack;
@@ -125,6 +136,68 @@ function deal(table) {
   round.turn = null;
   advance(table);
   return true;
+}
+
+function everyoneDecidedInsurance(table) {
+  const players = playingSeats(table);
+  return players.length > 0 && players.every(seat => seat.insurance !== null);
+}
+
+function decideInsurance(table, seat, take) {
+  if (table.round.phase !== 'insurance') {
+    throw new RoundError('not_insurance', 'Insurance is not open right now.');
+  }
+  if (!seat.hands?.length) {
+    throw new RoundError('not_in_hand', 'You are not in this hand.');
+  }
+  if (seat.insurance !== null) {
+    throw new RoundError('already_decided', 'You already made an insurance choice.');
+  }
+  if (take) {
+    const cost = insuranceCost(seat.bet);
+    if (seat.chips < cost) {
+      throw new RoundError('not_enough_chips', 'You do not have enough chips for insurance.');
+    }
+    seat.chips -= cost;
+    seat.insuranceBet = cost;
+    seat.insurance = 'insured';
+  } else {
+    seat.insuranceBet = 0;
+    seat.insurance = 'declined';
+  }
+}
+
+function resolveInsurancePhase(table) {
+  const round = table.round;
+  if (round.phase !== 'insurance') return;
+
+  for (const seat of playingSeats(table)) {
+    if (seat.insurance === null) seat.insurance = 'declined';
+  }
+
+  const dealerBlackjack = scoreHand(round.dealer).blackjack;
+  if (dealerBlackjack) {
+    round.insuranceMessage = 'Dealer has Blackjack!';
+    for (const seat of playingSeats(table)) {
+      if (seat.insuranceBet > 0) {
+        const won = insurancePayout(seat.insuranceBet);
+        seat.insurancePayout = won;
+        seat.chips += won;
+      }
+      for (const hand of seat.hands) hand.done = true;
+    }
+    playDealerAndSettle(table);
+    return;
+  }
+
+  round.insuranceMessage = 'No blackjack.';
+  for (const seat of playingSeats(table)) {
+    const hand = seat.hands[0];
+    if (scoreHand(hand.cards).blackjack) hand.done = true;
+  }
+  round.phase = 'playing';
+  round.turn = null;
+  advance(table);
 }
 
 // Move the turn to the next hand that still has to act, in seat order.
@@ -194,6 +267,7 @@ function act(table, seat, type) {
   const hand = currentHand(table, seat);
   const action = Object.hasOwn(ACTIONS, type) ? ACTIONS[type] : null;
   if (!action) throw new RoundError('invalid_action', 'Unknown action.');
+  table.round.insuranceMessage = null;
   action(table, seat, hand);
   advance(table);
 }
@@ -210,6 +284,11 @@ function forfeit(table, seat) {
     }
   }
   seat.inHand = false;
+  if (table.round.phase === 'insurance') {
+    seat.insurance = seat.insurance ?? 'declined';
+    if (everyoneDecidedInsurance(table)) resolveInsurancePhase(table);
+    return;
+  }
   if (table.round.phase === 'playing' && table.round.turn?.seat === seat.index) advance(table);
 }
 
@@ -241,6 +320,9 @@ function resetRound(table) {
     seat.bet = 0;
     seat.activeHandIndex = 0;
     seat.inHand = false;
+    seat.insurance = null;
+    seat.insuranceBet = 0;
+    seat.insurancePayout = 0;
   }
   table.round = newRound((table.round?.number ?? 0) + 1);
 }
@@ -257,6 +339,7 @@ function roundView(table, now) {
     phase: round.phase,
     turn: round.turn,
     msLeft: round.deadline ? Math.max(0, round.deadline - now) : null,
+    insuranceMessage: round.insuranceMessage ?? null,
     minBet: table.minBet,
     maxBet: table.maxBet,
     dealer,
@@ -266,6 +349,9 @@ function roundView(table, now) {
       name: seat.name,
       chips: seat.chips,
       bet: seat.bet ?? 0,
+      insurance: seat.insurance ?? null,
+      insuranceBet: seat.insuranceBet ?? 0,
+      insurancePayout: round.phase === 'settled' ? (seat.insurancePayout ?? 0) : 0,
       away: Boolean(seat.reservedUntil),
       activeHandIndex: seat.activeHandIndex ?? 0,
       hands: (seat.hands ?? []).map(hand => ({
@@ -291,6 +377,9 @@ module.exports = {
   everyoneHasBet,
   anyBets,
   deal,
+  decideInsurance,
+  everyoneDecidedInsurance,
+  resolveInsurancePhase,
   act,
   forfeit,
   playDealerAndSettle,

@@ -5,7 +5,7 @@ function totalBet(hands) {
   return hands.reduce((sum, hand) => sum + hand.bet, 0);
 }
 
-const SHARED_HAND_PHASES = ['playing', 'dealer'];
+const SHARED_HAND_PHASES = ['insurance', 'playing', 'dealer'];
 
 // Is a hand in progress? (the lobby shows the table as "In game", and leaving costs the bet)
 function sharedHandInProgress(seat, state) {

@@ -473,6 +473,14 @@ class TableStore extends EventEmitter {
     return { bet: seat.bet };
   }
 
+// Shared round: take or decline insurance when dealer shows an Ace
+  insurance(clientId, take) {
+    const { table, seat } = this._roundSeat(clientId);
+    round.decideInsurance(table, seat, Boolean(take));
+    this._roundChanged(table);
+    return { insurance: seat.insurance, insuranceBet: seat.insuranceBet };
+  }
+
   // Shared round: hit, stand, double or split on your turn
   action(clientId, type) {
     const { table, seat } = this._roundSeat(clientId);
@@ -503,6 +511,8 @@ class TableStore extends EventEmitter {
       round.resetRound(table);
     } else if (r.phase === 'betting' && round.everyoneHasBet(table)) {
       round.deal(table);
+    } else if (r.phase === 'insurance' && round.everyoneDecidedInsurance(table)) {
+      round.resolveInsurancePhase(table);
     }
 
     const current = table.round;
@@ -516,7 +526,11 @@ class TableStore extends EventEmitter {
       onTimeout = () => {
         if (!round.deal(table)) current.timerKey = null;
       };
-    } else if (current.phase === 'playing') {
+    }else if (current.phase === 'insurance') {
+      key = 'insurance';
+      ms = this.timing.insuranceMs ?? this.timing.betMs;
+      onTimeout = () => round.resolveInsurancePhase(table); 
+    }else if (current.phase === 'playing') {
       const seat = table.seats.find(s => s.index === current.turn.seat);
       const cards = seat?.hands[current.turn.hand]?.cards.length ?? 0;
       key = `turn:${current.turn.seat}:${current.turn.hand}:${cards}:${seat?.hands.length}`;

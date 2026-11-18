@@ -1,7 +1,7 @@
-import { RANKS, SUITS, cardValue, scoreHand, dealerShouldHit, compareHands, payoutFor, isPair } from '../shared/rules.js';
+import { RANKS, SUITS, cardValue, scoreHand, dealerShouldHit, compareHands, payoutFor, isPair, offersInsurance, insuranceCost, insurancePayout } from '../shared/rules.js';
 
 // The rules themselves live in shared/rules.js so the server's multiplayer round uses the exact same ones
-export { cardValue, scoreHand, dealerShouldHit, compareHands, isPair };
+export { cardValue, scoreHand, dealerShouldHit, compareHands, isPair, offersInsurance, insuranceCost, insurancePayout  };
 
 export const RULES = Object.freeze({ dealerStandsOnSoft17: true });
 
@@ -31,7 +31,10 @@ export function startGame(initialMoney = 1000) {
     result: null, 
     money: initialMoney,
     bet: 0,
-    activeHandIndex: 0
+    activeHandIndex: 0,
+    insuranceBet: 0,
+    insuranceStatus: null,
+    insuranceMessage: null
   };
 }
 
@@ -44,6 +47,24 @@ export function dealRound(game, betAmount = 10) {
   const player = [deck.pop()], 
   dealer = [deck.pop()];
   player.push(deck.pop()); dealer.push(deck.pop());
+
+if (offersInsurance(dealer)) {
+    return {
+      ...game,
+      money: currentMoney - wager,
+      bet: wager,
+      deck,
+      hands: [{ cards: player, bet: wager }],
+      player,
+      dealer,
+      activeHandIndex: 0,
+      phase: 'insurance',
+      result: null,
+      insuranceBet: 0,
+      insuranceStatus: 'offered',
+      insuranceMessage: null
+    };
+  }
 
   const finished = scoreHand(player).blackjack || scoreHand(dealer).blackjack;
   const result = finished ? compareHands(player, dealer) : null;
@@ -59,7 +80,61 @@ export function dealRound(game, betAmount = 10) {
     dealer: dealer, 
     activeHandIndex: 0,
     phase: finished ? 'finished' : 'player', 
-    result 
+    result,
+    insuranceBet: 0,
+    insuranceStatus: null,
+    insuranceMessage: null 
+  };
+}
+
+// Resolves the insurance decision when dealer shows an Ace.
+// takeInsurance: true to wager 50% of main bet, false to decline.
+export function resolveInsurance(game, takeInsurance) {
+  if (game.phase !== 'insurance') return game;
+
+  const cost = takeInsurance ? insuranceCost(game.bet) : 0;
+  if (takeInsurance && game.money < cost) return game;
+
+  let nextMoney = game.money - cost;
+  const dealerBlackjack = scoreHand(game.dealer).blackjack;
+  const playerBlackjack = scoreHand(game.player).blackjack;
+
+  if (dealerBlackjack) {
+    if (cost > 0) nextMoney += insurancePayout(cost);
+    const result = compareHands(game.player, game.dealer);
+    nextMoney = resolvePayout(nextMoney, game.bet, result, game.player);
+    return {
+      ...game,
+      money: nextMoney,
+      insuranceBet: cost,
+      insuranceStatus: takeInsurance ? 'insured' : 'declined',
+      insuranceMessage: takeInsurance ? 'Dealer has Blackjack! Insurance pays 2:1.' : 'Dealer has Blackjack.',
+      phase: 'finished',
+      result
+    };
+  }
+
+  if (playerBlackjack) {
+    nextMoney = resolvePayout(nextMoney, game.bet, 'player', game.player);
+    return {
+      ...game,
+      money: nextMoney,
+      insuranceBet: cost,
+      insuranceStatus: takeInsurance ? 'insured' : 'declined',
+      insuranceMessage: 'No blackjack.',
+      phase: 'finished',
+      result: 'player'
+    };
+  }
+
+  return {
+    ...game,
+    money: nextMoney,
+    insuranceBet: cost,
+    insuranceStatus: takeInsurance ? 'insured' : 'declined',
+    insuranceMessage: 'No blackjack.',
+    phase: 'player',
+    result: null
   };
 }
 
@@ -104,7 +179,7 @@ export function advanceTurnOrFinish(game, updatedHands){
 export function stand(game) {
   if (game.phase !== 'player') return game;
 
-  return advanceTurnOrFinish(game, game.hands);
+  return advanceTurnOrFinish({...game, insuranceMessage: null}, game.hands);
 
 }
 
@@ -120,14 +195,15 @@ export function hit(game) {
 
   const pScore = scoreHand(currentHand.cards);
   if (pScore.bust || pScore.total === 21) {
-    return advanceTurnOrFinish({ ...game, deck}, hands);
+    return advanceTurnOrFinish({ ...game, deck, insuranceMessage: null}, hands);
   }
 
   return {
     ...game,
     deck,
     hands,
-    player: currentHand.cards
+    player: currentHand.cards,
+    insuranceMessage: null
   };
 
 }
@@ -151,7 +227,7 @@ export function doubleDown(game) {
   hands[game.activeHandIndex] = updatedHand;
 
   const newMoney = game.money - currentHand.bet;
-  return advanceTurnOrFinish({ ...game, money: newMoney, deck }, hands);
+  return advanceTurnOrFinish({ ...game, money: newMoney, deck, insuranceMessage: null }, hands);
 
 }
 
@@ -186,6 +262,7 @@ export function splitHand(game){
     money: newMoney,
     deck,
     hands: newHands,
-    player: newHands[game.activeHandIndex].cards
+    player: newHands[game.activeHandIndex].cards,
+    insuranceMessage: null
   }
 }

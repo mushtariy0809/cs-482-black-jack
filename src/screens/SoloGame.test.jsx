@@ -134,4 +134,35 @@ describe('SoloGame', () => {
     renderGame(finished, { player: { type: 'guest', name: 'Guest' } });
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it('offers insurance on dealer Ace and shows No blackjack before continuing play', async () => {
+    const game = {
+      ...playingGame({ player: [card('9'), card('8')], dealer: [card('A', 'spades'), card('6', 'spades')], money: 990, bet: 10 }),
+      phase: 'insurance',
+      insuranceStatus: 'offered'
+    };
+    const { changes, user } = renderGame(game);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Dealer shows an Ace · Insurance (5 chips)?');
+    await user.click(screen.getByRole('button', { name: 'Take Insurance (5)' }));
+
+    expect(changes.at(-1).phase).toBe('player');
+    expect(changes.at(-1).money).toBe(985);
+    expect(screen.getByRole('status')).toHaveTextContent('No blackjack. · Your turn');
+  });
+
+  it('pays insurance 2:1 when dealer has blackjack', async () => {
+    const game = {
+      ...playingGame({ player: [card('9'), card('8')], dealer: [card('A', 'spades'), card('K', 'spades')], money: 990, bet: 10 }),
+      phase: 'insurance',
+      insuranceStatus: 'offered'
+    };
+    const { changes, user } = renderGame(game);
+
+    await user.click(screen.getByRole('button', { name: 'Take Insurance (5)' }));
+
+    expect(changes.at(-1).phase).toBe('finished');
+    expect(changes.at(-1).money).toBe(1000);
+    expect(screen.getByRole('status')).toHaveTextContent('Dealer has Blackjack! Insurance pays 2:1.');
+  });
 });

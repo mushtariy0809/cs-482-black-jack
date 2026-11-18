@@ -53,3 +53,17 @@ export function payoutFor(bet, result, cards) {
 export function isPair(cards) {
   return cards.length === 2 && cards[0].rank === cards[1].rank;
 }
+
+// Insurance is offered when the dealer's up-card is an Ace and there is a hole card behind it.
+// Cost is 50% of the bet, and if dealer has blackjack it pays 2:1 (3x insurance bet returned).
+export function offersInsurance(dealer) {
+  return Array.isArray(dealer) && dealer.length === 2 && dealer[0]?.rank === 'A';
+}
+
+export function insuranceCost(bet) {
+  return bet / 2;
+}
+
+export function insurancePayout(insuranceBet) {
+  return insuranceBet * 3;
+}
