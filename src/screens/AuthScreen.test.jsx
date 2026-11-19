@@ -16,7 +16,7 @@ function renderAuth(startMode = 'login') {
   return { onSuccess, onGuest, user: userEvent.setup() };
 }
 
-const loggedIn = { token: 'jwt', player: { id: 'p1', username: 'mush', email: 'm@x.com', role: 'player' } };
+const loggedIn = { token: 'jwt', player: { id: 'p1', username: 'mush', email: 'm@x.com', role: 'player', profilePicture: '/assets/avatar2.jpg' } };
 
 describe('AuthScreen', () => {
   it('logs in with email and password and hands back the player', async () => {
@@ -28,7 +28,7 @@ describe('AuthScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ email: 'm@x.com', password: 'secret123' });
-    expect(onSuccess).toHaveBeenCalledWith({ type: 'registered', name: 'mush', id: 'p1', email: 'm@x.com', token: 'jwt', role: 'player' });
+    expect(onSuccess).toHaveBeenCalledWith({ type: 'registered', name: 'mush', id: 'p1', email: 'm@x.com', token: 'jwt', role: 'player', profilePicture: '/assets/avatar2.jpg' });
   });
 
   it('passes the admin role back after admin login', async () => {
@@ -52,7 +52,8 @@ describe('AuthScreen', () => {
       id: 'admin1',
       email: 'admin@example.com',
       token: 'admin-jwt',
-      role: 'admin'
+      role: 'admin',
+      profilePicture: ''
     });
   });
 

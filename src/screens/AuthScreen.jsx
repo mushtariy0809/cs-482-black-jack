@@ -40,6 +40,7 @@ export default function AuthScreen({ mode, setMode, onSuccess, onGuest }) {
         email: data.player.email,
         token: data.token,
         role: data.player.role || 'player',
+        profilePicture: data.player.profilePicture || '',
         ...(data.player.chips !== undefined ? { chips: data.player.chips } : {})
       });
     } catch (error) {

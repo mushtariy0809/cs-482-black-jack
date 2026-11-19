@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminRequest } from './adminApi.js';
 import AdRevenue from './AdRevenue.jsx';
+import FeedbackInbox from './FeedbackInbox.jsx';
 import './admin.css';
 
 const number = value => new Intl.NumberFormat().format(value || 0);
@@ -499,6 +500,7 @@ export default function AdminDashboard({ player, onLogout }) {
           <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>Overview</button>
           <button className={tab === 'players' ? 'active' : ''} onClick={() => setTab('players')}>Players</button>
           <button className={tab === 'ads' ? 'active' : ''} onClick={() => setTab('ads')}>Ad revenue</button>
+          <button className={tab === 'feedback' ? 'active' : ''} onClick={() => setTab('feedback')}>Feedback</button>
         </nav>
         <div className="admin-topbar-user">
           <span>{player.name}</span>
@@ -511,6 +513,7 @@ export default function AdminDashboard({ player, onLogout }) {
         {tab === 'overview' && <Overview token={player.token} overview={overview} loading={loading} onRefresh={loadOverview} />}
         {tab === 'players' && <PlayerManagement token={player.token} adminId={player.id} />}
         {tab === 'ads' && <AdRevenue token={player.token} />}
+        {tab === 'feedback' && <FeedbackInbox token={player.token} />}
       </main>
     </div>
   );

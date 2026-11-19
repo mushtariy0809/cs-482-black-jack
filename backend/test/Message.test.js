@@ -30,6 +30,7 @@ test('validates successfully with private message defaults', async () => {
   assert.equal(doc.chatType, 'private');
   assert.equal(doc.table, null);
   assert.equal(doc.message, 'Good luck at the table!');
+  assert.equal(doc.readAt, null);
 });
 
 test('validates successfully with table message', async () => {

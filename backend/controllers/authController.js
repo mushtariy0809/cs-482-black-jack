@@ -69,7 +69,8 @@ const registerPlayer = async (req, res) => {
         username: player.username,
         email: player.email,
         role: player.role || 'player',
-        chips: player.chips ?? 1000
+        chips: player.chips ?? 1000,
+        profilePicture: player.profilePicture || ''
       }
     });
   } catch (error) {
@@ -122,7 +123,8 @@ const loginPlayer = async (req, res) => {
         username: player.username,
         email: player.email,
         role: player.role || 'player',
-        chips: player.chips ?? 1000
+        chips: player.chips ?? 1000,
+        profilePicture: player.profilePicture || ''
       }
     });
   } catch (error) {
@@ -134,7 +136,48 @@ const loginPlayer = async (req, res) => {
   }
 };
 
+const updatePlayerProfile = async (req, res) => {
+  const { username, profilePicture } = req.body;
+
+  if (
+    (username !== undefined && (typeof username !== 'string' || !username.trim())) ||
+    (profilePicture !== undefined && typeof profilePicture !== 'string')
+  ) {
+    return res.status(400).json({ message: 'Invalid profile information.' });
+  }
+
+  if (username === undefined && profilePicture === undefined) {
+    return res.status(400).json({ message: 'No profile changes were provided.' });
+  }
+
+  try {
+    const updatedPlayer = await Player.updateProfile(req.player._id, {
+      ...(username !== undefined ? { username: username.trim() } : {}),
+      ...(profilePicture !== undefined ? { profilePicture } : {})
+    });
+
+    return res.json({
+      player: {
+        id: updatedPlayer._id,
+        username: updatedPlayer.username,
+        profilePicture: updatedPlayer.profilePicture || ''
+      }
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'Username is already taken.' });
+    }
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Invalid profile information.' });
+    }
+
+    console.error('Profile update error:', error.message);
+    return res.status(500).json({ message: 'Unable to save profile changes.' });
+  }
+};
+
 module.exports = {
   registerPlayer,
-  loginPlayer
+  loginPlayer,
+  updatePlayerProfile
 };

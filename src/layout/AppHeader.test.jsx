@@ -45,6 +45,30 @@ describe('AppHeader', () => {
     expect(onLogOut).toHaveBeenCalled();
   });
 
+  it('lets registered players open the feedback form', async () => {
+    const onFeedback = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <AppHeader
+        screen="lobby"
+        player={{ type: 'registered', role: 'player', name: 'Mush' }}
+        chips={1000}
+        onHome={vi.fn()}
+        onNavigate={vi.fn()}
+        onLogOut={vi.fn()}
+        onFeedback={onFeedback}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Send feedback' }));
+    expect(onFeedback).toHaveBeenCalledOnce();
+  });
+
+  it('does not show player feedback controls to admins', () => {
+    renderHeader({ type: 'registered', role: 'admin', name: 'Admin' });
+    expect(screen.queryByRole('button', { name: 'Send feedback' })).not.toBeInTheDocument();
+  });
+
   it('identifies an admin account in the profile menu', async () => {
     const { user } = renderHeader({
       type: 'registered',

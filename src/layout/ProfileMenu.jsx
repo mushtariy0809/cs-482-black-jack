@@ -8,7 +8,10 @@ function ProfilePicture({ player, imageClass, placeholder: Placeholder, placehol
 }
 
 // Avatar button in the header with My Profile / View Friends / Log Out
-export default function ProfileMenu({ player, onProfile, onFriends, onLogOut }) {
+export default function ProfileMenu({
+  player, notificationCount = 0, friendRequestCount = 0,
+  onProfile, onFriends, onLogOut
+}) {
   const [open, setOpen] = useState(false);
 
   // Close the menu, then do what was picked
@@ -22,11 +25,18 @@ export default function ProfileMenu({ player, onProfile, onFriends, onLogOut }) 
       <button
         className="profile-button"
         onClick={() => setOpen(!open)}
-        aria-label="Open profile menu"
+        aria-label={notificationCount > 0
+          ? `Open profile menu, ${notificationCount} ${notificationCount === 1 ? 'notification' : 'notifications'}`
+          : 'Open profile menu'}
         aria-expanded={open}
         title="My Profile"
       >
         <ProfilePicture player={player} imageClass="header-profile-picture" placeholder="span" placeholderClass="profile-placeholder" />
+        {notificationCount > 0 && (
+          <span className="profile-notification-badge" aria-hidden="true">
+            {notificationCount > 99 ? '99+' : notificationCount}
+          </span>
+        )}
       </button>
 
       {open && (
@@ -41,18 +51,28 @@ export default function ProfileMenu({ player, onProfile, onFriends, onLogOut }) 
           <div className="profile-dropdown-divider"></div>
 
           <button onClick={pick(onProfile)}>
-            <span>👤</span>
-            My Profile
+            <span className="profile-menu-icon">👤</span>
+            <span className="profile-menu-label">My Profile</span>
           </button>
 
-          <button onClick={pick(onFriends)}>
-            <span>👥</span>
-            View Friends
+          <button
+            aria-label={notificationCount > 0
+              ? `View Friends, ${notificationCount} notifications, including ${friendRequestCount} friend requests`
+              : 'View Friends'}
+            onClick={pick(onFriends)}
+          >
+            <span className="profile-menu-icon">👥</span>
+            <span className="profile-menu-label">View Friends</span>
+            {notificationCount > 0 && (
+              <span className="profile-menu-count">
+                {notificationCount > 99 ? '99+' : notificationCount}
+              </span>
+            )}
           </button>
 
           <button onClick={pick(onLogOut)}>
-            <span>🚪</span>
-            Log Out
+            <span className="profile-menu-icon">🚪</span>
+            <span className="profile-menu-label">Log Out</span>
           </button>
         </div>
       )}
