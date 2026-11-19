@@ -1,8 +1,7 @@
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { mockFetch } from '../test/setup.js';
 import FeedbackInbox from './FeedbackInbox.jsx';
 
 const ticket = {
@@ -18,23 +17,22 @@ const ticket = {
 
 describe('FeedbackInbox', () => {
   it('shows player feedback and lets an admin reply and resolve it', async () => {
-    const fetch = mockFetch([
-      { url: 'http://localhost:5000/api/admin/feedback', body: [ticket] },
-      {
-        url: 'http://localhost:5000/api/admin/feedback/feedback-0001042',
-        method: 'PATCH',
-        body: {
-          ...ticket,
-          status: 'open',
-          replies: [{ senderRole: 'admin', message: 'We will investigate.' }]
-        }
-      },
-      {
-        url: 'http://localhost:5000/api/admin/feedback/feedback-0001042',
-        method: 'PATCH',
-        body: { ...ticket, status: 'resolved', replies: [] }
+    const fetch = vi.fn(async (_url, options = {}) => {
+      if (options.method !== 'PATCH') {
+        return { ok: true, json: async () => [ticket] };
       }
-    ]);
+
+      const changes = JSON.parse(options.body);
+      const updated = {
+        ...ticket,
+        ...changes,
+        replies: changes.reply
+          ? [{ senderRole: 'admin', message: changes.reply }]
+          : ticket.replies
+      };
+      return { ok: true, json: async () => updated };
+    });
+    vi.stubGlobal('fetch', fetch);
     const user = userEvent.setup();
     render(<FeedbackInbox token="admin-token" />);
 
