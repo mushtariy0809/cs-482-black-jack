@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { startGame, dealRound, hit, stand, doubleDown, splitHand, scoreHand, isPair, insuranceCost } from '../blackjack.js';
+import { startGame, dealRound, hit, stand, doubleDown, splitHand, scoreHand, isPair, insuranceCost, resolveInsurance } from '../blackjack.js';
 import TableFx, { DealtCard, ScorePill, dealDelay } from '../table/TableFx.jsx';
 import TableStage from '../table/TableStage.jsx';
 import Card from '../components/Card.jsx';
