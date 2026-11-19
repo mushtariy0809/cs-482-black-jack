@@ -13,6 +13,10 @@ const {
   updateAd,
   uploadAdMedia
 } = require('../controllers/adminAdsController');
+const {
+  listFeedback,
+  updateFeedback
+} = require('../controllers/feedbackController');
 
 const router = express.Router();
 
@@ -21,6 +25,8 @@ router.get('/overview', getOverview);
 router.get('/players', listPlayers);
 router.patch('/players/:playerId/role', updatePlayerRole);
 router.delete('/tables/:tableId', closeTable);
+router.get('/feedback', listFeedback);
+router.patch('/feedback/:ticketId', updateFeedback);
 
 // A4 Ad revenue: totals, and the ads players see
 router.get('/ads/summary', getAdSummary);

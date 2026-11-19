@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import FriendsScreen from './FriendsScreen.jsx';
 import { mockFetch } from '../test/setup.js';
 
-const me = { type: 'registered', id: 'me', name: 'Mush' };
+const me = { type: 'registered', id: 'me', name: 'Mush', token: 'test-token' };
 const FRIENDS = 'http://localhost:5000/api/friends';
 
 const lists = (friends, friendRequests) => ({ url: `${FRIENDS}/me`, body: { friends, friendRequests } });
@@ -59,7 +59,7 @@ describe('FriendsScreen', () => {
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ playerId: 'me', requesterId: 'r1' });
     expect(alert).toHaveBeenCalledWith('Friend request accepted!');
     expect(await screen.findByText('No pending friend requests.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Chat' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Chat with michele' })).toBeInTheDocument();
   });
 
   it('shows the server message when an action is refused', async () => {
@@ -109,9 +109,9 @@ describe('FriendsScreen', () => {
       { url: 'http://localhost:5000/api/messages/me/f1', body: [] }
     ]);
     const user = userEvent.setup();
-    render(<FriendsScreen player={me} onBack={() => {}} />);
+    render(<FriendsScreen player={me} messageCounts={{ f1: 4 }} onBack={() => {}} />);
 
-    await user.click(await screen.findByRole('button', { name: 'Chat' }));
+    await user.click(await screen.findByRole('button', { name: 'Chat with jorge, 4 unread messages' }));
     expect(await screen.findByText('No messages yet. Say hello!')).toBeInTheDocument();
   });
 });

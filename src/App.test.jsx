@@ -87,6 +87,37 @@ describe('App navigation', () => {
     expect(startTables).not.toHaveBeenCalled();
   });
 
+  it('shows new friend and message notifications on the profile icon', async () => {
+    mockFetch([
+      {
+        url: 'http://localhost:5000/api/auth/login',
+        method: 'POST',
+        body: {
+          token: 'player-token',
+          player: {
+            id: 'player-id',
+            username: 'ClubPlayer',
+            email: 'player@example.com',
+            role: 'player'
+          }
+        }
+      },
+      {
+        url: 'http://localhost:5000/api/messages/notifications',
+        body: { count: 3, friendRequestCount: 2, messageCounts: {} }
+      }
+    ]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Start the game' }));
+    await user.type(screen.getByLabelText('Email'), 'player@example.com');
+    await user.type(screen.getByLabelText('Password'), 'secure-password');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    expect(await screen.findByRole('button', { name: 'Open profile menu, 3 notifications' })).toBeInTheDocument();
+  });
+
   it('a screen that needs a login falls back to the welcome screen', async () => {
     const user = userEvent.setup();
     render(<App />);

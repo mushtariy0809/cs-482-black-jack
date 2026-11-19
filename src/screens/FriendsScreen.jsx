@@ -40,7 +40,7 @@ function FriendRequests({ requests, onAccept, onDecline }) {
   );
 }
 
-function FriendsList({ friends, onChat, onRemove }) {
+function FriendsList({ friends, messageCounts, onChat, onRemove }) {
   return (
     <div className="friends-list">
       {friends.length === 0 ? (
@@ -49,7 +49,18 @@ function FriendsList({ friends, onChat, onRemove }) {
         friends.map(friend => (
           <FriendRow key={friend._id} person={friend}>
             <div className="friend-actions">
-              <button className="friend-chat-button" onClick={() => onChat(friend)}>Chat</button>
+              <button
+                className="friend-chat-button"
+                aria-label={`Chat with ${friend.username}${messageCounts[friend._id] ? `, ${messageCounts[friend._id]} unread messages` : ''}`}
+                onClick={() => onChat(friend)}
+              >
+                Chat
+                {messageCounts[friend._id] > 0 && (
+                  <span className="friend-message-count">
+                    {messageCounts[friend._id] > 99 ? '99+' : messageCounts[friend._id]}
+                  </span>
+                )}
+              </button>
               <button className="friend-remove-button" onClick={() => onRemove(friend._id)}>Remove</button>
             </div>
           </FriendRow>
@@ -123,7 +134,7 @@ function PlayerSearch({ player, onAdd }) {
   );
 }
 
-export default function FriendsScreen({ player, onBack }) {
+export default function FriendsScreen({ player, onBack, messageCounts = {} }) {
   const [friends, setFriends] = useState([]);
   const [friendRequests, setFriendRequests] = useState([]);
   const [selectedFriend, setSelectedFriend] = useState(null);
@@ -208,7 +219,12 @@ export default function FriendsScreen({ player, onBack }) {
           {!loading && !error && (
             <>
               <FriendRequests requests={friendRequests} onAccept={acceptFriendRequest} onDecline={declineFriendRequest} />
-              <FriendsList friends={friends} onChat={setSelectedFriend} onRemove={removeFriend} />
+              <FriendsList
+                friends={friends}
+                messageCounts={messageCounts}
+                onChat={setSelectedFriend}
+                onRemove={removeFriend}
+              />
             </>
           )}
         </section>

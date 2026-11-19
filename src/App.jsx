@@ -29,9 +29,11 @@ import WatchAdButton from './ads/WatchAdButton.jsx';
 import { useVideoAds } from './ads/useVideoAds.js';
 import { saveHandToHistory } from './history/saveHistory.js';
 import { usePlayerTimer } from './timer.js';
+import FeedbackModal from './feedback/FeedbackModal.jsx';
 import './styles.css';
 
 const GUEST = { type: 'guest', name: 'Guest' };
+const EMPTY_NOTIFICATION_SUMMARY = { count: 0, friendRequestCount: 0, messageCounts: {} };
 
 // The game screen zooms its table itself (see SoloGame) so its ad column never moves
 const screenMotion = { initial: false, animate: { opacity: 1 }, exit: { opacity: 1, transition: { duration: 0 } } };
@@ -82,6 +84,8 @@ export default function App() {
   const [screen, setScreen] = useState('start');
   const [game, setGame] = useState(null);
   const [player, setPlayer] = useState(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [notificationSummary, setNotificationSummary] = useState(EMPTY_NOTIFICATION_SUMMARY);
   const [authMode, setAuthMode] = useState('login');
   const [bet, setBet] = useState(10);
   // Table the player is seated at
@@ -105,11 +109,50 @@ export default function App() {
   const [chips, setChips] = useChips(game, mySharedSeat);
   const timeLeft = usePlayerTimer(game, setGame);
   const registered = player?.type === 'registered';
+  const receivesNotifications = registered && player.role !== 'admin';
 
   const ads = useVideoAds({ enabled: Boolean(player), identity: player?.token ?? 'guest', onReward: collectAdReward });
 
   useEffect(() => { main.current?.focus(); }, [screen]);
   useAppSounds(screen, Boolean(ads.session));
+
+  useEffect(() => {
+    if (!receivesNotifications) {
+      setNotificationSummary(EMPTY_NOTIFICATION_SUMMARY);
+      return undefined;
+    }
+
+    let active = true;
+    async function refreshNotifications() {
+      try {
+        const response = await fetch('http://localhost:5000/api/messages/notifications', {
+          headers: { Authorization: `Bearer ${player.token}` }
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Unable to retrieve notifications.');
+        }
+
+        if (active) {
+          setNotificationSummary({
+            count: data.count ?? 0,
+            friendRequestCount: data.friendRequestCount ?? 0,
+            messageCounts: data.messageCounts ?? {}
+          });
+        }
+      } catch (error) {
+        console.error('Notification refresh error:', error);
+      }
+    }
+
+    refreshNotifications();
+    const interval = setInterval(refreshNotifications, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [receivesNotifications, player?.id, player?.token, screen]);
 
   // Out of chips: offer a video ad, unless a hand is being played
   const minBet = table ? (live?.minBet ?? table.minBet ?? LOBBY_MIN_BET) : LOBBY_MIN_BET;
@@ -367,7 +410,15 @@ export default function App() {
         }
         break;
       case 'friends':
-        if (registered) return <FriendsScreen player={player} onBack={home} />;
+        if (registered) {
+          return (
+            <FriendsScreen
+              player={player}
+              messageCounts={notificationSummary.messageCounts}
+              onBack={home}
+            />
+          );
+        }
         break;
       case 'profile':
         if (registered) return <ProfileEditor player={player} onSave={saveProfile} onCancel={home} />;
@@ -385,6 +436,9 @@ export default function App() {
           <AppHeader
             screen={screen}
             player={player}
+            notificationCount={notificationSummary.count}
+            friendRequestCount={notificationSummary.friendRequestCount}
+            onFeedback={() => setFeedbackOpen(true)}
             chips={chips}
             onHome={home}
             onNavigate={setScreen}
@@ -434,6 +488,9 @@ export default function App() {
           <AnimatePresence>
             {ads.session && <AdPlayer key={ads.session.viewId} session={ads.session} onFinish={ads.finish} onClose={ads.close} />}
           </AnimatePresence>
+          {feedbackOpen && player?.type === 'registered' && player.role !== 'admin' && (
+            <FeedbackModal player={player} onClose={() => setFeedbackOpen(false)} />
+          )}
         </>
       )}
     </>

@@ -8,7 +8,8 @@ const Player = require('../models/Player');
 
 const {
   sendMessage,
-  getMessages
+  getMessages,
+  getNotificationCount
 } = require('./messagesController');
 
 const senderId = '507f1f77bcf86cd799439011';
@@ -199,6 +200,7 @@ test('getMessages should retrieve a conversation successfully', async (t) => {
     }
   ]);
 
+  const markRead = t.mock.method(Message, 'updateMany', async () => ({ modifiedCount: 1 }));
   t.mock.method(Player, 'findById', async () => player);
 
   const populateReceiver = t.mock.fn(async () => messages);
@@ -216,6 +218,7 @@ test('getMessages should retrieve a conversation successfully', async (t) => {
   }));
 
   const req = {
+    player,
     params: {
       playerId: senderId,
       friendId: receiverId
@@ -228,8 +231,16 @@ test('getMessages should retrieve a conversation successfully', async (t) => {
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, messages);
+  assert.deepEqual(markRead.mock.calls[0].arguments[0], {
+    chatType: 'private',
+    sender: receiverId,
+    receiver: senderId,
+    readAt: null
+  });
+  assert.ok(markRead.mock.calls[0].arguments[1].$set.readAt instanceof Date);
 
   assert.deepEqual(findMock.mock.calls[0].arguments[0], {
+    chatType: 'private',
     $or: [
       { sender: senderId, receiver: receiverId },
       { sender: receiverId, receiver: senderId }
@@ -266,6 +277,7 @@ test('getMessages should reject conversations with non-friends', async (t) => {
   t.mock.method(Player, 'findById', async () => player);
 
   const req = {
+    player,
     params: {
       playerId: senderId,
       friendId: receiverId
@@ -291,6 +303,7 @@ test('getMessages should return 500 when retrieving messages fails', async (t) =
   t.mock.method(console, 'error', () => {});
 
   const req = {
+    player: createPlayer(senderId),
     params: {
       playerId: senderId,
       friendId: receiverId
@@ -303,4 +316,48 @@ test('getMessages should return 500 when retrieving messages fails', async (t) =
 
   assert.equal(res.statusCode, 500);
   assert.equal(res.body.message, 'Unable to retrieve messages.');
+});
+
+test('getMessages rejects a conversation requested for another account', async () => {
+  const req = {
+    player: createPlayer(receiverId),
+    params: { playerId: senderId, friendId: receiverId }
+  };
+  const res = createResponse();
+
+  await getMessages(req, res);
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.message, 'You can only view your own conversations.');
+});
+
+test('getNotificationCount combines friend requests and unread private messages', async t => {
+  const player = { _id: receiverId, receivedFriendRequests: ['friend-a'] };
+  player.friends = ['friend-a', 'friend-b'];
+  const countUnread = t.mock.method(Message, 'aggregate', async () => [
+    { _id: 'friend-a', count: 4 },
+    { _id: 'friend-b', count: 3 }
+  ]);
+  const req = { player };
+  const res = createResponse();
+
+  await getNotificationCount(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    count: 8,
+    friendRequestCount: 1,
+    messageCounts: { 'friend-a': 4, 'friend-b': 3 }
+  });
+  assert.deepEqual(countUnread.mock.calls[0].arguments[0][0], {
+    $match: {
+      chatType: 'private',
+      receiver: receiverId,
+      sender: { $in: ['friend-a', 'friend-b'] },
+      readAt: null
+    }
+  });
+  assert.deepEqual(countUnread.mock.calls[0].arguments[0][1], {
+    $group: { _id: '$sender', count: { $sum: 1 } }
+  });
 });

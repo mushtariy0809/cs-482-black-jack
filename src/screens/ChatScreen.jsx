@@ -10,7 +10,8 @@ export default function ChatScreen({ player, friend, onBack }) {
   async function loadMessages() {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/messages/${player.id}/${friend._id}`
+        `http://localhost:5000/api/messages/${player.id}/${friend._id}`,
+        { headers: { Authorization: `Bearer ${player.token}` } }
       );
 
       const data = await response.json();
