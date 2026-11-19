@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_URL } from '../apiUrl.js';
 
 // Private chat with one friend (polls for new messages every 3 seconds)
 export default function ChatScreen({ player, friend, onBack }) {
@@ -10,7 +11,7 @@ export default function ChatScreen({ player, friend, onBack }) {
   async function loadMessages() {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/messages/${player.id}/${friend._id}`,
+        `${API_URL}/api/messages/${player.id}/${friend._id}`,
         { headers: { Authorization: `Bearer ${player.token}` } }
       );
 
@@ -41,7 +42,7 @@ export default function ChatScreen({ player, friend, onBack }) {
 
     try {
       const response = await fetch(
-        'http://localhost:5000/api/messages/send',
+        `${API_URL}/api/messages/send`,
         {
           method: 'POST',
           headers: {

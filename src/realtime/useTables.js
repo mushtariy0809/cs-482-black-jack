@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from 'react';
 import { io } from 'socket.io-client';
 import { getClientId } from './clientId.js';
+import { API_URL } from '../apiUrl.js';
 import { createMockTables, mockAction } from './mockTables.js';
 
-export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+export const SOCKET_URL = API_URL;
 const ACK_TIMEOUT_MS = 8000;
 
 const socket = io(SOCKET_URL, {

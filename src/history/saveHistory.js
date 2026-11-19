@@ -1,4 +1,5 @@
 import { scoreHand } from '../blackjack.js';
+import { API_URL } from '../apiUrl.js';
 
 // 'player' | 'dealer' | 'push'  ->  what the history API stores
 export function historyResult(result) {
@@ -19,7 +20,7 @@ export function saveHandToHistory({ player, key, result, playerCards, dealerCard
   if (player?.type !== 'registered' || !player?.id || savedKeys.has(key)) return null;
   savedKeys.add(key);
 
-  return fetch('http://localhost:5000/api/history', {
+  return fetch(`${API_URL}/api/history`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

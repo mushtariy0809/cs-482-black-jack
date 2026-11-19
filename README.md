@@ -24,6 +24,19 @@ npm run build        # production build of the frontend
 
 Single parts: `npm run dev:frontend`, `npm run dev:backend`, `npm run test:logic`, `npm run test:backend`, `npm run test:ui`.
 
+## Deploying (Render)
+
+In production one Express server serves the built frontend (`dist/`), the REST API and Socket.IO on a single URL, so the frontend calls its own origin (see `src/apiUrl.js`; in `npm run dev` it uses `http://localhost:5000`).
+
+Render → New → Web Service from this repo:
+
+- **Build command:** `npm install && npm run build`
+- **Start command:** `npm --prefix backend start`
+- **Environment:** `MONGO_URI`, `JWT_SECRET`, `NODE_VERSION=22` (optionally `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`). Render sets `PORT`.
+- MongoDB Atlas → Network Access must allow `0.0.0.0/0` (Render has no fixed IP on the free plan).
+
+Keep it to one instance (live tables are held in server memory). Admin-uploaded ads in `backend/uploads/` are lost on each deploy/restart unless a persistent disk is attached.
+
 ## Code Layout
 
 - `shared/rules.js`: blackjack rules (card values, scoring, dealer, payouts) used by both the browser and the server

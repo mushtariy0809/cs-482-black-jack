@@ -6,6 +6,7 @@ import { copyText } from '../invite/inviteLink.js';
 import { LockIcon, StatusBadge } from '../lobby/tableInfo.jsx';
 import { deleteTable, getMyTables, useTables } from '../realtime/useTables.js';
 import '../history/history.css';
+import { API_URL } from '../apiUrl.js';
 
 // History (registered players): every hand played, plus the tables you created.
 // Hands saved before tables and cards were recorded only have the two scores.
@@ -127,7 +128,7 @@ function HandsTab({ player, onFindTable }) {
   const [shown, setShown] = useState(PAGE_SIZE);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/history/${player.id}`)
+    fetch(`${API_URL}/api/history/${player.id}`)
       .then(response => {
         if (!response.ok) {
           throw new Error('Could not load game history.');

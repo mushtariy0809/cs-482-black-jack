@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_URL } from '../apiUrl.js';
 
 export default function FeedbackModal({ player, onClose }) {
   const [view, setView] = useState('new');
@@ -21,7 +22,7 @@ export default function FeedbackModal({ player, onClose }) {
     setLoadingTickets(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/feedback/mine', {
+      const response = await fetch(`${API_URL}/api/feedback/mine`, {
         headers: { Authorization: `Bearer ${player.token}` }
       });
       const data = await response.json();
@@ -47,7 +48,7 @@ export default function FeedbackModal({ player, onClose }) {
     setSending(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/feedback', {
+      const response = await fetch(`${API_URL}/api/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

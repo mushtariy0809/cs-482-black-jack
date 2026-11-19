@@ -1,5 +1,6 @@
+import { API_URL } from '../apiUrl.js';
 // Calls to the backend friends API (backend/routes/friends.js)
-const FRIENDS_URL = 'http://localhost:5000/api/friends';
+const FRIENDS_URL = `${API_URL}/api/friends`;
 
 // { friends, friendRequests } for a player
 export async function fetchFriends(playerId) {

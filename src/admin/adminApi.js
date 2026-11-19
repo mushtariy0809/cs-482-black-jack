@@ -1,5 +1,6 @@
+import { API_URL } from '../apiUrl.js';
 
-const ADMIN_URL = 'http://localhost:5000/api/admin';
+const ADMIN_URL = `${API_URL}/api/admin`;
 
 export async function adminRequest(token, path, options = {}) {
   const response = await fetch(`${ADMIN_URL}${path}`, {

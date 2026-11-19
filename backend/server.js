@@ -7,6 +7,7 @@ const friendsRoutes = require('./routes/friends');
 const adminRoutes = require('./routes/admin');
 
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
@@ -37,9 +38,23 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: res => res.set('X-Content-Type-Options', 'nosniff')
 }));
 
-app.get('/', (req, res) => {
-  res.send('21 CLUB backend is running!');
-});
+// Production: serve the built React app (`npm run build` → dist/) from this same server,
+// so the site, the API and Socket.IO all share one URL. In dev, Vite serves the frontend instead.
+const DIST_DIR = path.join(__dirname, '..', 'dist');
+const INDEX_HTML = path.join(DIST_DIR, 'index.html');
+
+if (fs.existsSync(INDEX_HTML)) {
+  app.use(express.static(DIST_DIR, { index: false }));
+  // Any other page request (e.g. an invite link) gets the app; unknown /api and /uploads paths still 404
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || /^\/(api|uploads|socket\.io)(\/|$)/.test(req.path)) return next();
+    res.sendFile(INDEX_HTML);
+  });
+} else {
+  app.get('/', (req, res) => {
+    res.send('21 CLUB backend is running!');
+  });
+}
 
 /*
 app.listen(PORT, () => {

@@ -31,6 +31,7 @@ import { saveHandToHistory } from './history/saveHistory.js';
 import { usePlayerTimer } from './timer.js';
 import FeedbackModal from './feedback/FeedbackModal.jsx';
 import './styles.css';
+import { API_URL } from './apiUrl.js';
 
 const GUEST = { type: 'guest', name: 'Guest' };
 const EMPTY_NOTIFICATION_SUMMARY = { count: 0, friendRequestCount: 0, messageCounts: {} };
@@ -127,7 +128,7 @@ export default function App() {
     let active = true;
     async function refreshNotifications() {
       try {
-        const response = await fetch('http://localhost:5000/api/messages/notifications', {
+        const response = await fetch(`${API_URL}/api/messages/notifications`, {
           headers: { Authorization: `Bearer ${player.token}` }
         });
         const data = await response.json();
@@ -309,7 +310,7 @@ export default function App() {
   }
 
   async function saveProfile(updatedProfile) {
-    const response = await fetch('http://localhost:5000/api/auth/profile', {
+    const response = await fetch(`${API_URL}/api/auth/profile`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

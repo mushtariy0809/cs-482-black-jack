@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Card, { WELCOME_CARDS } from '../components/Card.jsx';
+import { API_URL } from '../apiUrl.js';
 
 export default function AuthScreen({ mode, setMode, onSuccess, onGuest }) {
   const [username, setUsername] = useState('');
@@ -15,7 +16,7 @@ export default function AuthScreen({ mode, setMode, onSuccess, onGuest }) {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/auth/${mode === 'register' ? 'register' : 'login'}`,
+        `${API_URL}/api/auth/${mode === 'register' ? 'register' : 'login'}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
