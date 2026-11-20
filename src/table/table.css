@@ -41,6 +41,15 @@
   padding: 10px 22px;
 }
 
+.table-bar-actions .table-bar-chat {
+  position: relative;
+}
+
+.table-bar-chat .profile-notification-badge {
+  top: -8px;
+  right: -8px;
+}
+
 /* Leave mid-hand confirmation. The table screen has no ads, so a full-screen backdrop is fine. */
 
 .leave-backdrop {

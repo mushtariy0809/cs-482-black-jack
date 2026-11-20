@@ -93,6 +93,8 @@ export default function App() {
   const [table, setTable] = useState(null);
   const [showTableChat, setShowTableChat] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [activeTableChatSeat, setActiveTableChatSeat] = useState(null);
+  const [unreadPrivateBySeat, setUnreadPrivateBySeat] = useState({});
   // Table to join as soon as the lobby opens (tutorial's "Practice with bots")
   const [autoJoinId, setAutoJoinId] = useState(null);
   // Invite code to join once the player is in the lobby (?join=CODE link or a friend's invite)
@@ -103,11 +105,12 @@ export default function App() {
   const [brokeDismissed, setBrokeDismissed] = useState(false);
   const [notice, setNotice] = useState('');
   const historySaved = useRef(new Set());
+  const observedTableChat = useRef({ tableId: null, chatMessages: [], privateMessages: [] });
   const main = useRef(null);
 
   const session = useTableSession({ table, screen, game });
   const { live, mySeat, offline, shared, sharedState, mySharedSeat, inHand, stake } = session;
-  const { chipGrant } = useTables();
+  const { chipGrant, chatMessages, privateMessages } = useTables();
   const [chips, setChips] = useChips(game, mySharedSeat);
   const timeLeft = usePlayerTimer(game, setGame);
   const lastGrantId = useRef(null);
@@ -118,6 +121,50 @@ export default function App() {
 
   useEffect(() => { main.current?.focus(); }, [screen]);
   useAppSounds(screen, Boolean(ads.session));
+
+  const [unreadTableMessages, setUnreadTableMessages] = useState(0);
+
+  useEffect(() => {
+    const tableId = table?.id ?? null;
+    const observed = observedTableChat.current;
+
+    if (observed.tableId !== tableId) {
+      observedTableChat.current = { tableId, chatMessages, privateMessages };
+      setUnreadTableMessages(0);
+      setUnreadPrivateBySeat({});
+      setActiveTableChatSeat(null);
+      return;
+    }
+
+    const newTableMessages = chatMessages.filter(message =>
+      !observed.chatMessages.includes(message) &&
+      message.tableId === tableId &&
+      String(message.playerId) !== String(player?.id)
+    );
+    const newPrivateMessages = privateMessages.filter(message =>
+      !observed.privateMessages.includes(message) &&
+      message.tableId === tableId &&
+      String(message.recipientPlayerId) === String(player?.id)
+    );
+
+    observedTableChat.current = { tableId, chatMessages, privateMessages };
+    const unreadPrivateMessages = newPrivateMessages.filter(message =>
+      !showTableChat || message.senderSeat !== activeTableChatSeat
+    );
+    if (unreadPrivateMessages.length) {
+      setUnreadPrivateBySeat(current => {
+        const next = { ...current };
+        unreadPrivateMessages.forEach(message => {
+          next[message.senderSeat] = (next[message.senderSeat] ?? 0) + 1;
+        });
+        return next;
+      });
+    }
+
+    if (!showTableChat && (newTableMessages.length || newPrivateMessages.length)) {
+      setUnreadTableMessages(count => count + newTableMessages.length + newPrivateMessages.length);
+    }
+  }, [table?.id, chatMessages, privateMessages, player?.id, showTableChat, activeTableChatSeat]);
 
   useEffect(() => {
     if (!receivesNotifications) {
@@ -234,6 +281,10 @@ export default function App() {
 
   async function sitAt(joinedTable) {
     setTable(joinedTable);
+    setShowTableChat(false);
+    setUnreadTableMessages(0);
+    setUnreadPrivateBySeat({});
+    setActiveTableChatSeat(null);
 
     const result = await joinTable({ tableId: joinedTable.id });
     if (!result.ok) {
@@ -251,6 +302,8 @@ export default function App() {
   function exitTable() {
     setConfirmLeave(false);
     setShowInvite(false);
+    setShowTableChat(false);
+    setUnreadTableMessages(0);
     leaveTable();
     setTable(null);
     setGame(null);
@@ -309,6 +362,16 @@ export default function App() {
     setScreen('start');
   }
 
+  function exitGuest() {
+    if (table) leaveTable();
+    stopTables();
+    setTable(null);
+    setPlayer(null);
+    setGame(null);
+    setAuthMode('login');
+    setScreen('auth');
+  }
+
   async function saveProfile(updatedProfile) {
     const response = await fetch(`${API_URL}/api/auth/profile`, {
       method: 'PATCH',
@@ -335,6 +398,29 @@ export default function App() {
     home();
   }
 
+  function openTableChat() {
+    setUnreadTableMessages(0);
+    setActiveTableChatSeat(null);
+    setShowTableChat(true);
+  }
+
+  function closeTableChat() {
+    setActiveTableChatSeat(null);
+    setShowTableChat(false);
+  }
+
+  function selectTableChatConversation(seatIndex) {
+    setActiveTableChatSeat(seatIndex);
+    if (seatIndex == null) return;
+
+    setUnreadPrivateBySeat(current => {
+      if (!current[seatIndex]) return current;
+      const next = { ...current };
+      delete next[seatIndex];
+      return next;
+    });
+  }
+
   function renderSharedTable() {
     if (!sharedState) {
       return (
@@ -352,11 +438,19 @@ export default function App() {
           mySeatIndex={mySeat?.seat}
           maxSeats={live?.maxSeats ?? 5}
           Card={Card}
-          toolbar={<TableBar table={table} onLeave={requestLeave} onChat={() => setShowTableChat(true)} canChat={Boolean(player?.token && !table.solo)} onInvite={() => setShowInvite(true)} />}
+          toolbar={<TableBar table={table} onLeave={requestLeave} onChat={openTableChat} unreadChatCount={unreadTableMessages} canChat={Boolean(player?.token && !table.solo)} onInvite={() => setShowInvite(true)} />}
           onChangeTable={requestLeave}
           onRoundSettled={saveSharedRound}
         />
-        {showTableChat && <TableChat player={player} table={table} onClose={() => setShowTableChat(false)} />}
+        {showTableChat && (
+          <TableChat
+            player={player}
+            table={table}
+            unreadPrivateBySeat={unreadPrivateBySeat}
+            onActiveChatChange={selectTableChatConversation}
+            onClose={closeTableChat}
+          />
+        )}
         <AnimatePresence>
           {showInvite && (
             <InvitePanel table={live ?? table} player={player} pin={tablePins[table.id] ?? ''} onClose={() => setShowInvite(false)} />
@@ -458,6 +552,7 @@ export default function App() {
             onHome={home}
             onNavigate={setScreen}
             onLogOut={logOut}
+            onGuestExit={exitGuest}
             adButton={<WatchAdButton status={ads.status} onWatch={watchAd} />}
           />
 

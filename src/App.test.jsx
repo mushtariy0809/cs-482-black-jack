@@ -8,7 +8,7 @@ import { startTables, stopTables } from './realtime/useTables.js';
 
 // No live server in tests: the lobby connection is a stub
 vi.mock('./realtime/useTables.js', () => ({
-  useTables: () => ({ tables: [], mySeat: null, tableState: null, offline: true, connection: 'connected', chatMessages: [], invites: [] }),
+  useTables: () => ({ tables: [], mySeat: null, tableState: null, offline: true, connection: 'connected', chatMessages: [], privateMessages: [], invites: [] }),
   getAdStatus: vi.fn(async () => ({ ok: true, status: { reward: 100, perDay: 5, watchedToday: 0, remaining: 5, nextAt: null } })),
   startAd: vi.fn(),
   completeAd: vi.fn(),
@@ -45,6 +45,16 @@ describe('App navigation', () => {
     await user.click(screen.getByRole('button', { name: 'Continue as Guest' }));
     expect(await screen.findByText('Lobby screen')).toBeInTheDocument();
     expect(screen.getByText('1,000 chips')).toBeInTheDocument();
+  });
+
+  it('lets a guest exit to the login screen', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Continue as Guest' }));
+    await user.click(screen.getByRole('button', { name: 'Exit guest session' }));
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back.' })).toBeInTheDocument();
   });
 
   it('routes an admin login to the admin dashboard, not the player lobby', async () => {

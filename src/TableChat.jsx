@@ -6,7 +6,9 @@ import {
   sendPrivateTableChat
 } from './realtime/useTables.js';
 
-export default function TableChat({ player, table, onClose }) {
+export default function TableChat({
+  player, table, onClose, unreadPrivateBySeat = {}, onActiveChatChange = () => {}
+}) {
   const { chatMessages, privateMessages, tableState, mySeat } = useTables();
 
   const [activeChat, setActiveChat] = useState('table');
@@ -110,7 +112,10 @@ export default function TableChat({ player, table, onClose }) {
             className: `table-chat-tab ${
               activeChat === 'table' ? 'active' : ''
             }`,
-            onClick: () => setActiveChat('table')
+            onClick: () => {
+              setActiveChat('table');
+              onActiveChatChange(null);
+            }
           },
           'Table Chat'
         ),
@@ -123,9 +128,22 @@ export default function TableChat({ player, table, onClose }) {
               className: `table-chat-tab ${
                 activeChat === `player-${seat.index}` ? 'active' : ''
               }`,
-              onClick: () => setActiveChat(`player-${seat.index}`)
+              onClick: () => {
+                setActiveChat(`player-${seat.index}`);
+                onActiveChatChange(seat.index);
+              },
+              'aria-label': unreadPrivateBySeat[seat.index]
+                ? `${seat.name}, ${unreadPrivateBySeat[seat.index]} unread messages`
+                : seat.name
             },
-            seat.name
+            seat.name,
+            unreadPrivateBySeat[seat.index] > 0
+              ? React.createElement(
+                  'span',
+                  { className: 'profile-notification-badge', 'aria-hidden': true },
+                  unreadPrivateBySeat[seat.index] > 99 ? '99+' : unreadPrivateBySeat[seat.index]
+                )
+              : null
           )
         )
       ),

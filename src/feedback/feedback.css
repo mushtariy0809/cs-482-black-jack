@@ -17,6 +17,13 @@
   height: 30px;
 }
 
+.feedback-support-button:not(.guest-exit-button) svg {
+  width: 26px;
+  height: 26px;
+  place-self: center;
+  transform: translateX(1px);
+}
+
 .feedback-support-button:hover {
   border-color: rgba(114, 237, 190, 0.72);
   color: var(--mint);

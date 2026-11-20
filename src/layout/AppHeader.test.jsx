@@ -9,7 +9,7 @@ vi.mock('../realtime/useTables.js', () => ({
 }));
 
 function renderHeader(player, screenName = 'lobby') {
-  const props = { onHome: vi.fn(), onNavigate: vi.fn(), onLogOut: vi.fn() };
+  const props = { onHome: vi.fn(), onNavigate: vi.fn(), onLogOut: vi.fn(), onGuestExit: vi.fn() };
   render(<AppHeader screen={screenName} player={player} chips={1250} {...props} />);
   return { ...props, user: userEvent.setup() };
 }
@@ -26,6 +26,15 @@ describe('AppHeader', () => {
     expect(screen.getByText('1,250 chips')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open profile menu' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Exit guest session' })).toBeInTheDocument();
+  });
+
+  it('lets guests exit the game', async () => {
+    const { onGuestExit, user } = renderHeader({ type: 'guest', name: 'Guest' });
+
+    await user.click(screen.getByRole('button', { name: 'Exit guest session' }));
+
+    expect(onGuestExit).toHaveBeenCalledOnce();
   });
 
   it('registered players get history and the profile menu', async () => {

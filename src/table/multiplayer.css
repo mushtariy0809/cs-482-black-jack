@@ -264,11 +264,14 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  padding: 10px 10px 0 0;
+  margin: -10px -10px 0 0;
   overflow-x: auto;
   scrollbar-width: thin;
 }
 
 .table-chat-tab {
+  position: relative;
   flex-shrink: 0;
   padding: 9px 13px !important;
   color: #dce9df !important;
@@ -277,6 +280,16 @@
   border-radius: 8px 8px 0 0 !important;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.table-chat-tab .profile-notification-badge {
+  top: -8px;
+  right: -8px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .table-chat-tab.active {

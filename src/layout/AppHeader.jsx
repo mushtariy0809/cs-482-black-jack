@@ -8,7 +8,7 @@ import '../feedback/feedback.css';
 // Logo, main navigation, profile menu, connection/sound controls and the chip count.
 // adButton: the "Watch ad for chips" button (U21), shown next to the chip count.
 export default function AppHeader({
-  screen, player, chips, onHome, onNavigate, onLogOut,
+  screen, player, chips, onHome, onNavigate, onLogOut, onGuestExit,
   notificationCount = 0, friendRequestCount = 0, onFeedback, adButton = null
 }) {
   const registered = player?.type === 'registered';
@@ -56,6 +56,20 @@ export default function AppHeader({
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
         <ConnectionPill />
         <SoundButton compact />
+        {player?.type === 'guest' && (
+          <button
+            className="feedback-support-button guest-exit-button"
+            type="button"
+            onClick={onGuestExit}
+            aria-label="Exit guest session"
+            title="Exit guest session"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M14 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8" />
+              <path d="M10 12h10m-4-4 4 4-4 4" />
+            </svg>
+          </button>
+        )}
         {registered && player.role !== 'admin' && (
           <button
             className="feedback-support-button"
