@@ -24,6 +24,15 @@ function seatedStore(timing = fast) {
 function standEveryone(store, tableId, clients) {
   for (let guard = 0; guard < 20; guard++) {
     const state = store.roundState(tableId);
+    if (state.phase === 'insurance') {
+      for (const seat of state.seats) {
+        if (seat.insurance === null) {
+          const who = clients.find(c => c.name === seat.name);
+          if (who) store.insurance(who.clientId, false);
+        }
+      }
+      continue;
+    }
     if (state.phase !== 'playing') return state;
     const turnSeat = state.seats.find(s => s.index === state.turn.seat);
     const who = clients.find(c => c.name === turnSeat.name);
@@ -56,17 +65,19 @@ test('two players share one deal, one dealer and take turns in seat order', asyn
   const ids = [...a.hands[0].cards, ...b.hands[0].cards, ...state.dealer].map(c => c.id);
   assert.equal(new Set(ids).size, 6);
 
-  if (state.phase === 'playing') {
+  if (state.phase === 'playing' || state.phase === 'insurance') {
     // Dealer's hole card is hidden while players act
     assert.equal(state.dealer[1].hidden, true);
     assert.equal(state.dealer[1].rank, undefined);
 
-    const waiting = state.turn.seat === 0 ? bob : alice;
-    assert.throws(() => store.action(waiting.clientId, 'hit'), { code: 'not_your_turn' });
+    if (state.phase === 'playing') {
+      const waiting = state.turn.seat === 0 ? bob : alice;
+      assert.throws(() => store.action(waiting.clientId, 'hit'), { code: 'not_your_turn' });
+    }
     standEveryone(store, 'green-room', [alice, bob]);
   }
 
-  assert.equal(store.roundState('green-room').phase, 'dealer');
+  assert.ok(['dealer', 'settled'].includes(store.roundState('green-room').phase));
   await wait(25);
 
   const settled = store.roundState('green-room');
